@@ -1,0 +1,150 @@
+[
+  {
+    "doctype": "Custom Field",
+    "name": "Company-custom_tin",
+    "module": "Blueline",
+    "dt": "Company",
+    "fieldname": "custom_tin",
+    "label": "TIN (Taxpayer Identification Number)",
+    "fieldtype": "Data",
+    "insert_after": "tax_id",
+    "description": "9-digit TIN issued by Commissioner General of Inland Revenue (Sri Lanka)"
+  },
+  {
+    "doctype": "Custom Field",
+    "name": "Company-custom_svat_no",
+    "module": "Blueline",
+    "dt": "Company",
+    "fieldname": "custom_svat_no",
+    "label": "SVAT Number",
+    "fieldtype": "Data",
+    "insert_after": "custom_tin"
+  },
+  {
+    "doctype": "Custom Field",
+    "name": "Company-custom_branch_code",
+    "module": "Blueline",
+    "dt": "Company",
+    "fieldname": "custom_branch_code",
+    "label": "Branch Code (for Invoice Serial)",
+    "fieldtype": "Data",
+    "insert_after": "custom_svat_no",
+    "description": "QQQQ part of gazette serial number e.g. GIIN or BLIN"
+  },
+  {
+    "doctype": "Custom Field",
+    "name": "Company-custom_bank_section",
+    "module": "Blueline",
+    "dt": "Company",
+    "fieldname": "custom_bank_section",
+    "label": "Bank Details",
+    "fieldtype": "Section Break",
+    "insert_after": "custom_branch_code"
+  },
+  {
+    "doctype": "Custom Field",
+    "name": "Company-custom_bank_name",
+    "module": "Blueline",
+    "dt": "Company",
+    "fieldname": "custom_bank_name",
+    "label": "Bank Name",
+    "fieldtype": "Data",
+    "insert_after": "custom_bank_section"
+  },
+  {
+    "doctype": "Custom Field",
+    "name": "Company-custom_bank_account_number",
+    "module": "Blueline",
+    "dt": "Company",
+    "fieldname": "custom_bank_account_number",
+    "label": "Bank Account Number",
+    "fieldtype": "Data",
+    "insert_after": "custom_bank_name"
+  },
+  {
+    "doctype": "Custom Field",
+    "name": "Company-custom_bank_address",
+    "module": "Blueline",
+    "dt": "Company",
+    "fieldname": "custom_bank_address",
+    "label": "Bank Address",
+    "fieldtype": "Small Text",
+    "insert_after": "custom_bank_account_number"
+  },
+  {
+    "doctype": "Custom Field",
+    "name": "Customer-custom_tin",
+    "module": "Blueline",
+    "dt": "Customer",
+    "fieldname": "custom_tin",
+    "label": "TIN (Taxpayer Identification Number)",
+    "fieldtype": "Data",
+    "insert_after": "tax_id",
+    "description": "Auto-saved on first invoice and auto-populated on future invoices"
+  },
+  {
+    "doctype": "Custom Field",
+    "name": "Customer-custom_place_of_supply",
+    "module": "Blueline",
+    "dt": "Customer",
+    "fieldname": "custom_place_of_supply",
+    "label": "Default Place of Supply",
+    "fieldtype": "Data",
+    "insert_after": "custom_tin",
+    "default": "Sri Lanka"
+  },
+  {
+    "doctype": "Custom Field",
+    "name": "Customer-custom_mode_of_payment",
+    "module": "Blueline",
+    "dt": "Customer",
+    "fieldname": "custom_mode_of_payment",
+    "label": "Default Mode of Payment",
+    "fieldtype": "Data",
+    "insert_after": "custom_place_of_supply"
+  },
+  {
+    "doctype": "Custom Field",
+    "name": "Sales Invoice-custom_tax_invoice_serial",
+    "module": "Blueline",
+    "dt": "Sales Invoice",
+    "fieldname": "custom_tax_invoice_serial",
+    "label": "Tax Invoice Serial No.",
+    "fieldtype": "Data",
+    "insert_after": "naming_series",
+    "read_only": 1,
+    "description": "Auto-generated on submit. Format: YYMMM_QQQQ_XXXXX (Sri Lanka Gazette EOG 03-0219)"
+  },
+  {
+    "doctype": "Custom Field",
+    "name": "Sales Invoice-custom_date_of_supply",
+    "module": "Blueline",
+    "dt": "Sales Invoice",
+    "fieldname": "custom_date_of_supply",
+    "label": "Date of Supply",
+    "fieldtype": "Date",
+    "insert_after": "custom_tax_invoice_serial",
+    "description": "Date on which goods or services were supplied (Gazette requirement)"
+  },
+  {
+    "doctype": "Custom Field",
+    "name": "Sales Invoice-custom_place_of_supply",
+    "module": "Blueline",
+    "dt": "Sales Invoice",
+    "fieldname": "custom_place_of_supply",
+    "label": "Place of Supply",
+    "fieldtype": "Data",
+    "insert_after": "custom_date_of_supply",
+    "default": "Sri Lanka"
+  },
+  {
+    "doctype": "Custom Field",
+    "name": "Sales Invoice-custom_mode_of_payment",
+    "module": "Blueline",
+    "dt": "Sales Invoice",
+    "fieldname": "custom_mode_of_payment",
+    "label": "Mode of Payment",
+    "fieldtype": "Data",
+    "insert_after": "custom_place_of_supply"
+  }
+]
