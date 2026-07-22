@@ -1,0 +1,42 @@
+[
+  {
+    "doctype": "Custom Field",
+    "module": "Blueline",
+    "dt": "Sales Invoice",
+    "fieldname": "custom_tax_invoice_serial",
+    "label": "Tax Invoice Serial No.",
+    "fieldtype": "Data",
+    "insert_after": "naming_series",
+    "read_only": 1,
+    "description": "Auto-generated on submit. Format: YYMMM_QQQQ_XXXXX (Sri Lanka Gazette EOG 03-0219)"
+  },
+  {
+    "doctype": "Custom Field",
+    "module": "Blueline",
+    "dt": "Sales Invoice",
+    "fieldname": "custom_date_of_supply",
+    "label": "Date of Supply",
+    "fieldtype": "Date",
+    "insert_after": "custom_tax_invoice_serial",
+    "description": "Date on which goods or services were supplied (Gazette requirement)"
+  },
+  {
+    "doctype": "Custom Field",
+    "module": "Blueline",
+    "dt": "Sales Invoice",
+    "fieldname": "custom_place_of_supply",
+    "label": "Place of Supply",
+    "fieldtype": "Data",
+    "insert_after": "custom_date_of_supply",
+    "default": "Sri Lanka"
+  },
+  {
+    "doctype": "Custom Field",
+    "module": "Blueline",
+    "dt": "Sales Invoice",
+    "fieldname": "custom_mode_of_payment",
+    "label": "Mode of Payment",
+    "fieldtype": "Data",
+    "insert_after": "custom_place_of_supply"
+  }
+]
