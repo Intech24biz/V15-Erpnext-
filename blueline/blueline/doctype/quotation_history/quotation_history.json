@@ -1,0 +1,419 @@
+{
+ "actions": [],
+ "allow_import": 1,
+ "allow_rename": 0,
+ "autoname": "field:old_quotation_no",
+ "creation": "2026-08-24 00:00:00.000000",
+ "description": "Read-mostly archive of Quotation records migrated from a legacy instance. Loaded once via Data Import; not part of the live selling workflow.",
+ "doctype": "DocType",
+ "document_type": "Document",
+ "engine": "InnoDB",
+ "field_order": [
+  "source_section",
+  "old_quotation_no",
+  "old_instance",
+  "column_break_src",
+  "title",
+  "status",
+  "customer_section",
+  "customer_name",
+  "customer",
+  "column_break_cust",
+  "transaction_date",
+  "valid_till",
+  "order_type",
+  "company_section",
+  "company",
+  "currency",
+  "conversion_rate",
+  "column_break_comp",
+  "selling_price_list",
+  "items_section",
+  "items",
+  "total_qty",
+  "totals_section",
+  "total",
+  "net_total",
+  "total_taxes_and_charges",
+  "column_break_totals",
+  "discount_amount",
+  "additional_discount_percentage",
+  "grand_total",
+  "base_grand_total",
+  "rounding_adjustment",
+  "rounded_total",
+  "in_words",
+  "sales_info_section",
+  "customer_group",
+  "territory",
+  "campaign",
+  "column_break_sales",
+  "source",
+  "opportunity",
+  "order_lost_reason",
+  "address_section",
+  "customer_address",
+  "contact_person",
+  "contact_mobile",
+  "column_break_addr",
+  "contact_email",
+  "shipping_address",
+  "terms_section",
+  "payment_terms_template",
+  "terms"
+ ],
+ "fields": [
+  {
+   "fieldname": "source_section",
+   "fieldtype": "Section Break",
+   "label": "Source Reference"
+  },
+  {
+   "description": "Original Quotation name/number as it appeared on the legacy instance. Used as the unique key for this record.",
+   "fieldname": "old_quotation_no",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Old Quotation No",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "default": "Legacy Instance",
+   "description": "Name/URL of the old system this record was migrated from, for traceability",
+   "fieldname": "old_instance",
+   "fieldtype": "Data",
+   "label": "Source Instance"
+  },
+  {
+   "fieldname": "column_break_src",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "Title"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "\nDraft\nOpen\nReplied\nPartially Ordered\nOrdered\nLost\nCancelled\nExpired"
+  },
+  {
+   "fieldname": "customer_section",
+   "fieldtype": "Section Break",
+   "label": "Customer & Dates"
+  },
+  {
+   "bold": 1,
+   "description": "Customer name as it appeared on the old instance",
+   "fieldname": "customer_name",
+   "fieldtype": "Data",
+   "in_global_search": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Customer",
+   "reqd": 1
+  },
+  {
+   "description": "Only set if this customer already exists as a Customer master in this instance",
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Linked Customer",
+   "options": "Customer"
+  },
+  {
+   "fieldname": "column_break_cust",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "transaction_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "valid_till",
+   "fieldtype": "Date",
+   "label": "Valid Till"
+  },
+  {
+   "fieldname": "order_type",
+   "fieldtype": "Select",
+   "label": "Order Type",
+   "options": "\nSales\nMaintenance\nShopping Cart"
+  },
+  {
+   "fieldname": "company_section",
+   "fieldtype": "Section Break",
+   "label": "Company & Currency"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency"
+  },
+  {
+   "default": "1",
+   "fieldname": "conversion_rate",
+   "fieldtype": "Float",
+   "label": "Exchange Rate",
+   "precision": "9"
+  },
+  {
+   "fieldname": "column_break_comp",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "selling_price_list",
+   "fieldtype": "Data",
+   "label": "Price List"
+  },
+  {
+   "fieldname": "items_section",
+   "fieldtype": "Section Break",
+   "label": "Items"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Items",
+   "options": "Quotation History Item"
+  },
+  {
+   "fieldname": "total_qty",
+   "fieldtype": "Float",
+   "label": "Total Quantity"
+  },
+  {
+   "fieldname": "totals_section",
+   "fieldtype": "Section Break",
+   "label": "Totals"
+  },
+  {
+   "fieldname": "total",
+   "fieldtype": "Currency",
+   "label": "Total",
+   "options": "currency"
+  },
+  {
+   "fieldname": "net_total",
+   "fieldtype": "Currency",
+   "label": "Net Total",
+   "options": "currency"
+  },
+  {
+   "fieldname": "total_taxes_and_charges",
+   "fieldtype": "Currency",
+   "label": "Total Taxes and Charges",
+   "options": "currency"
+  },
+  {
+   "fieldname": "column_break_totals",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "discount_amount",
+   "fieldtype": "Currency",
+   "label": "Additional Discount Amount",
+   "options": "currency"
+  },
+  {
+   "fieldname": "additional_discount_percentage",
+   "fieldtype": "Float",
+   "label": "Additional Discount Percentage"
+  },
+  {
+   "bold": 1,
+   "fieldname": "grand_total",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Grand Total",
+   "options": "currency"
+  },
+  {
+   "description": "Grand Total converted to the Company's default currency — use this (not Grand Total) when aggregating across records, since old_instance data mixes currencies (e.g. LKR and USD)",
+   "fieldname": "base_grand_total",
+   "fieldtype": "Currency",
+   "label": "Grand Total (Company Currency)",
+   "options": "Company:company:default_currency"
+  },
+  {
+   "fieldname": "rounding_adjustment",
+   "fieldtype": "Currency",
+   "label": "Rounding Adjustment",
+   "options": "currency"
+  },
+  {
+   "fieldname": "rounded_total",
+   "fieldtype": "Currency",
+   "label": "Rounded Total",
+   "options": "currency"
+  },
+  {
+   "fieldname": "in_words",
+   "fieldtype": "Data",
+   "label": "In Words"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "sales_info_section",
+   "fieldtype": "Section Break",
+   "label": "Sales Info"
+  },
+  {
+   "fieldname": "customer_group",
+   "fieldtype": "Data",
+   "label": "Customer Group"
+  },
+  {
+   "fieldname": "territory",
+   "fieldtype": "Data",
+   "label": "Territory"
+  },
+  {
+   "fieldname": "campaign",
+   "fieldtype": "Data",
+   "label": "Campaign"
+  },
+  {
+   "fieldname": "column_break_sales",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "source",
+   "fieldtype": "Data",
+   "label": "Lead Source"
+  },
+  {
+   "fieldname": "opportunity",
+   "fieldtype": "Data",
+   "label": "Opportunity"
+  },
+  {
+   "depends_on": "eval:doc.status=='Lost'",
+   "fieldname": "order_lost_reason",
+   "fieldtype": "Small Text",
+   "label": "Lost Reason"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "address_section",
+   "fieldtype": "Section Break",
+   "label": "Address & Contact"
+  },
+  {
+   "fieldname": "customer_address",
+   "fieldtype": "Small Text",
+   "label": "Customer Address"
+  },
+  {
+   "fieldname": "contact_person",
+   "fieldtype": "Data",
+   "label": "Contact Person"
+  },
+  {
+   "fieldname": "contact_mobile",
+   "fieldtype": "Data",
+   "label": "Mobile No"
+  },
+  {
+   "fieldname": "column_break_addr",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "contact_email",
+   "fieldtype": "Data",
+   "label": "Contact Email"
+  },
+  {
+   "fieldname": "shipping_address",
+   "fieldtype": "Small Text",
+   "label": "Shipping Address"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "terms_section",
+   "fieldtype": "Section Break",
+   "label": "Terms"
+  },
+  {
+   "fieldname": "payment_terms_template",
+   "fieldtype": "Data",
+   "label": "Payment Terms Template"
+  },
+  {
+   "fieldname": "terms",
+   "fieldtype": "Text Editor",
+   "label": "Term Details"
+  }
+ ],
+ "icon": "fa fa-history",
+ "idx": 0,
+ "index_web_pages_for_search": 0,
+ "is_submittable": 0,
+ "links": [],
+ "modified": "2026-08-24 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Blueline",
+ "name": "Quotation History",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "import": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "import": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales User",
+   "share": 1
+  }
+ ],
+ "search_fields": "customer_name,status,transaction_date,company",
+ "show_name_in_global_search": 1,
+ "sort_field": "transaction_date",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "customer_name",
+ "track_changes": 1
+}
