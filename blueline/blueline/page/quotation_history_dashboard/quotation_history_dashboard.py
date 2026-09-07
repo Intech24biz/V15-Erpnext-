@@ -115,10 +115,31 @@ def get_dashboard_data(company=None, from_date=None, to_date=None, status=None):
 		bucket["count"] += 1
 		bucket["value"] += flt(row.base_grand_total)
 
+	qhi = frappe.qb.DocType("Quotation History Item")
+
+	top_items = _apply_filters(
+		frappe.qb.from_(qhi)
+		.join(qh)
+		.on(qhi.parent == qh.name)
+		.select(
+			qhi.item_code,
+			qhi.item_name,
+			Sum(qhi.qty).as_("total_qty"),
+			Sum(qhi.amount).as_("total_value"),
+			Count(qhi.parent).distinct().as_("quotation_count"),
+		)
+		.groupby(qhi.item_code, qhi.item_name)
+		.orderby(Sum(qhi.amount), order=Order.desc)
+		.limit(10),
+		qh,
+		filters,
+	).run(as_dict=True)
+
 	return {
 		"summary": summary,
 		"status_breakdown": status_breakdown,
 		"company_breakdown": company_breakdown,
 		"top_customers": top_customers,
 		"monthly_trend": list(trend_map.values()),
+		"top_items": top_items,
 	}

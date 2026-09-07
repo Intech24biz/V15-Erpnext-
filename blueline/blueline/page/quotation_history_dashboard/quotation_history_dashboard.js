@@ -136,6 +136,16 @@ blueline.QuotationHistoryDashboard = class QuotationHistoryDashboard {
 						<div class="qhd-company-breakdown"></div>
 					</div>
 				</div>
+				<div class="row qhd-charts">
+					<div class="col-md-6">
+						<div class="qhd-chart-title">${__("Top Items Quoted")}</div>
+						<div class="qhd-top-items-chart"></div>
+					</div>
+					<div class="col-md-6">
+						<div class="qhd-chart-title">${__("Top Items Quoted (Detail)")}</div>
+						<div class="qhd-top-items"></div>
+					</div>
+				</div>
 			</div>
 		`).appendTo(this.page.body);
 	}
@@ -160,6 +170,7 @@ blueline.QuotationHistoryDashboard = class QuotationHistoryDashboard {
 		this.render_trend_chart(data.monthly_trend);
 		this.render_top_customers(data.top_customers);
 		this.render_company_breakdown(data.company_breakdown);
+		this.render_top_items(data.top_items);
 	}
 
 	render_cards(summary) {
@@ -247,6 +258,52 @@ blueline.QuotationHistoryDashboard = class QuotationHistoryDashboard {
 					<td>${frappe.utils.escape_html(row.customer_name || "")}</td>
 					<td class="text-right">${row.count}</td>
 					<td class="text-right">${format_currency(row.value, currency)}</td>
+				</tr>
+			`).appendTo($tbody);
+		});
+	}
+
+	render_top_items(rows) {
+		const currency = frappe.defaults.get_default("currency");
+		const $chart = this.body.find(".qhd-top-items-chart").empty();
+		const $el = this.body.find(".qhd-top-items").empty();
+		if (!rows || !rows.length) {
+			$chart.html(`<div class="text-muted">${__("No Data")}</div>`);
+			$el.html(`<div class="text-muted">${__("No Data")}</div>`);
+			return;
+		}
+
+		new frappe.Chart($chart[0], {
+			data: {
+				labels: rows.map((d) => d.item_name || d.item_code),
+				datasets: [{ name: __("Value"), values: rows.map((d) => d.total_value) }],
+			},
+			type: "bar",
+			height: 260,
+			colors: ["#5e64ff"],
+		});
+
+		const table = $(`
+			<table class="table table-bordered">
+				<thead>
+					<tr>
+						<th>${__("Item")}</th>
+						<th class="text-right">${__("Qty")}</th>
+						<th class="text-right">${__("Value")}</th>
+						<th class="text-right">${__("Quotations")}</th>
+					</tr>
+				</thead>
+				<tbody></tbody>
+			</table>
+		`).appendTo($el);
+		const $tbody = table.find("tbody");
+		rows.forEach((row) => {
+			$(`
+				<tr>
+					<td>${frappe.utils.escape_html(row.item_name || row.item_code || "")}</td>
+					<td class="text-right">${row.total_qty}</td>
+					<td class="text-right">${format_currency(row.total_value, currency)}</td>
+					<td class="text-right">${row.quotation_count}</td>
 				</tr>
 			`).appendTo($tbody);
 		});
