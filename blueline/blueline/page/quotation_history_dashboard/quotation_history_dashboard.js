@@ -229,6 +229,10 @@ blueline.QuotationHistoryDashboard = class QuotationHistoryDashboard {
 			height: 260,
 			lineOptions: { regionFill: 1 },
 			colors: ["#5e64ff"],
+			axisOptions: {
+				shortenYAxisNumbers: 1,
+				numberFormatter: frappe.utils.format_chart_axis_number,
+			},
 		});
 	}
 
@@ -263,6 +267,11 @@ blueline.QuotationHistoryDashboard = class QuotationHistoryDashboard {
 		});
 	}
 
+	truncate_label(label, max_length = 15) {
+		label = label || "";
+		return label.length > max_length ? `${label.slice(0, max_length - 1)}…` : label;
+	}
+
 	render_top_items(rows) {
 		const currency = frappe.defaults.get_default("currency");
 		const $chart = this.body.find(".qhd-top-items-chart").empty();
@@ -273,14 +282,31 @@ blueline.QuotationHistoryDashboard = class QuotationHistoryDashboard {
 			return;
 		}
 
+		const full_name_by_label = {};
+		const chart_labels = rows.map((d) => {
+			const full_name = d.item_name || d.item_code || "";
+			const short_label = this.truncate_label(full_name);
+			full_name_by_label[short_label] = full_name;
+			return short_label;
+		});
+
 		new frappe.Chart($chart[0], {
 			data: {
-				labels: rows.map((d) => d.item_name || d.item_code),
+				labels: chart_labels,
 				datasets: [{ name: __("Value"), values: rows.map((d) => d.total_value) }],
 			},
 			type: "bar",
 			height: 260,
 			colors: ["#5e64ff"],
+			axisOptions: {
+				shortenYAxisNumbers: 1,
+				numberFormatter: frappe.utils.format_chart_axis_number,
+				seriesLabelSpaceRatio: 0.9,
+			},
+			tooltipOptions: {
+				formatTooltipX: (label) => full_name_by_label[label] || label,
+				formatTooltipY: (value) => format_currency(value, currency),
+			},
 		});
 
 		const table = $(`
