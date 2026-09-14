@@ -1,0 +1,65 @@
+[
+ {
+  "attach_files": "",
+  "attach_print": 0,
+  "channel": "System Notification",
+  "condition": "doc.workflow_state == 'Pending Approval'",
+  "date_changed": null,
+  "days_in_advance": 0,
+  "docstatus": 0,
+  "doctype": "Notification",
+  "document_type": "Quotation",
+  "enabled": 1,
+  "event": "Value Change",
+  "from_attach_field": null,
+  "is_standard": 0,
+  "message": "<p>A quotation requires your approval.</p>\n<p><b>Quotation:</b> {{ doc.name }}<br>\n<b>Customer:</b> {{ doc.customer_name or doc.party_name or '-' }}<br>\n<b>Company:</b> {{ doc.company }}<br>\n<b>Grand Total:</b> {{ doc.get_formatted('grand_total') }}<br>\n<b>Raised by:</b> {{ doc.owner }}</p>\n<p>Please review and approve in the system.</p>",
+  "message_type": "Markdown",
+  "method": null,
+  "modified": "2026-09-14 08:07:52.628030",
+  "module": null,
+  "name": "GI Quotation Pending Approval",
+  "print_format": null,
+  "property_value": null,
+  "recipients": [
+   {
+    "bcc": null,
+    "cc": null,
+    "condition": null,
+    "parent": "GI Quotation Pending Approval",
+    "parentfield": "recipients",
+    "parenttype": "Notification",
+    "receiver_by_document_field": null,
+    "receiver_by_role": "GI Management"
+   },
+   {
+    "bcc": null,
+    "cc": null,
+    "condition": null,
+    "parent": "GI Quotation Pending Approval",
+    "parentfield": "recipients",
+    "parenttype": "Notification",
+    "receiver_by_document_field": null,
+    "receiver_by_role": "GI Sales Dept"
+   },
+   {
+    "bcc": null,
+    "cc": null,
+    "condition": null,
+    "parent": "GI Quotation Pending Approval",
+    "parentfield": "recipients",
+    "parenttype": "Notification",
+    "receiver_by_document_field": null,
+    "receiver_by_role": "GI Tech Dept"
+   }
+  ],
+  "send_system_notification": 1,
+  "send_to_all_assignees": 0,
+  "sender": null,
+  "sender_email": null,
+  "set_property_after_alert": null,
+  "slack_webhook_url": null,
+  "subject": "Quotation {{ doc.name }} pending your approval",
+  "value_changed": "workflow_state"
+ }
+]
