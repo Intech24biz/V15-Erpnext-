@@ -2,6 +2,13 @@
  {
   "docstatus": 0,
   "doctype": "Workflow Action Master",
+  "modified": "2026-09-14 07:15:14.133837",
+  "name": "Submit",
+  "workflow_action_name": "Submit"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
   "modified": "2023-12-17 20:20:43.303396",
   "name": "Approve",
   "workflow_action_name": "Approve"

@@ -27,11 +27,11 @@ fixtures = [
     {"doctype": "Workflow", "filters": [["name", "like", "GI %"]]},
     {
         "doctype": "Workflow State",
-        "filters": [["name", "in", ["Pending Approval", "Approved"]]],
+        "filters": [["name", "in", ["Draft", "Pending Approval", "Approved"]]],
     },
     {
         "doctype": "Workflow Action Master",
-        "filters": [["name", "in", ["Approve", "Send for Approval"]]],
+        "filters": [["name", "in", ["Approve", "Submit", "Send for Approval"]]],
     },
     {"doctype": "Notification", "filters": [["name", "like", "GI %"]]},
 ]
