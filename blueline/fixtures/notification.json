@@ -250,5 +250,58 @@
   "slack_webhook_url": null,
   "subject": "Payment Entry {{ doc.name }} pending your approval",
   "value_changed": "workflow_state"
+ },
+ {
+  "attach_files": "",
+  "attach_print": 0,
+  "channel": "System Notification",
+  "condition": "doc.workflow_state == 'Pending Approval'",
+  "date_changed": null,
+  "days_in_advance": 0,
+  "docstatus": 0,
+  "doctype": "Notification",
+  "document_type": "Petty Cash Voucher",
+  "enabled": 1,
+  "event": "Value Change",
+  "from_attach_field": null,
+  "is_standard": 0,
+  "message": "<p>A petty cash voucher requires your approval.</p>\n<p><b>Voucher:</b> {{ doc.name }}<br>\n<b>Company:</b> {{ doc.company }}<br>\n<b>Amount:</b> {{ doc.get_formatted('amount') }}<br>\n<b>Purpose:</b> {{ doc.purpose }}<br>\n<b>Requested by:</b> {{ doc.requested_by or doc.owner }}</p>\n<p>Please review and approve in the system.</p>",
+  "message_type": "Markdown",
+  "method": null,
+  "modified": "2026-09-14 16:23:41.380974",
+  "module": null,
+  "name": "GI Petty Cash Pending Approval",
+  "print_format": null,
+  "property_value": null,
+  "recipients": [
+   {
+    "bcc": null,
+    "cc": null,
+    "condition": null,
+    "parent": "GI Petty Cash Pending Approval",
+    "parentfield": "recipients",
+    "parenttype": "Notification",
+    "receiver_by_document_field": null,
+    "receiver_by_role": "GI Management"
+   },
+   {
+    "bcc": null,
+    "cc": null,
+    "condition": null,
+    "parent": "GI Petty Cash Pending Approval",
+    "parentfield": "recipients",
+    "parenttype": "Notification",
+    "receiver_by_document_field": null,
+    "receiver_by_role": "GI Tech Dept"
+   }
+  ],
+  "send_system_notification": 1,
+  "send_to_all_assignees": 0,
+  "sender": null,
+  "sender_email": null,
+  "set_property_after_alert": null,
+  "slack_webhook_url": null,
+  "subject": "Petty Cash Voucher {{ doc.name }} pending your approval",
+  "value_changed": "workflow_state"
  }
 ]
