@@ -1,0 +1,56 @@
+{
+ "actions": [],
+ "creation": "2026-09-18 00:00:00.000000",
+ "description": "Centralised, per-company Chart of Accounts mapping configuration. Stage 1: structure and basic field validation only — row-level company segregation and write-permission restrictions are not enforced yet.",
+ "doctype": "DocType",
+ "document_type": "Other",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "company_mappings"
+ ],
+ "fields": [
+  {
+   "fieldname": "company_mappings",
+   "fieldtype": "Table",
+   "label": "Company Mappings",
+   "options": "Company COA Mapping"
+  }
+ ],
+ "icon": "fa fa-sitemap",
+ "idx": 0,
+ "index_web_pages_for_search": 0,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-09-18 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Blueline",
+ "name": "Global COA Mapping Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

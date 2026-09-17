@@ -1,0 +1,167 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-09-18 00:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "Document",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "financial_section",
+  "company",
+  "default_cash_account",
+  "column_break_fin1",
+  "default_bank_account",
+  "temporary_opening_account",
+  "default_cost_center",
+  "stock_section",
+  "stock_adjustment_account",
+  "stock_received_but_not_billed",
+  "column_break_stock1",
+  "expenses_included_in_valuation",
+  "default_valuation_method",
+  "default_warehouse",
+  "currency_section",
+  "exchange_gain_loss_account",
+  "column_break_curr1",
+  "foreign_currency_revaluation_account",
+  "inter_company_clearing_account",
+  "guardrail_section",
+  "earliest_allowed_posting_date"
+ ],
+ "fields": [
+  {
+   "fieldname": "financial_section",
+   "fieldtype": "Section Break",
+   "label": "Financial & Balancing"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "default_cash_account",
+   "fieldtype": "Link",
+   "label": "Default Cash Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "column_break_fin1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "default_bank_account",
+   "fieldtype": "Link",
+   "label": "Default Bank Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "temporary_opening_account",
+   "fieldtype": "Link",
+   "label": "Temporary Opening Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "default_cost_center",
+   "fieldtype": "Link",
+   "label": "Default Cost Center",
+   "options": "Cost Center"
+  },
+  {
+   "fieldname": "stock_section",
+   "fieldtype": "Section Break",
+   "label": "Stock & Valuation"
+  },
+  {
+   "fieldname": "stock_adjustment_account",
+   "fieldtype": "Link",
+   "label": "Stock Adjustment Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "stock_received_but_not_billed",
+   "fieldtype": "Link",
+   "label": "Stock Received But Not Billed",
+   "options": "Account"
+  },
+  {
+   "fieldname": "column_break_stock1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "expenses_included_in_valuation",
+   "fieldtype": "Link",
+   "label": "Expenses Included In Valuation",
+   "options": "Account"
+  },
+  {
+   "default": "FIFO",
+   "fieldname": "default_valuation_method",
+   "fieldtype": "Select",
+   "label": "Default Valuation Method",
+   "options": "FIFO\nMoving Average"
+  },
+  {
+   "fieldname": "default_warehouse",
+   "fieldtype": "Link",
+   "label": "Default Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "currency_section",
+   "fieldtype": "Section Break",
+   "label": "Multi-Currency"
+  },
+  {
+   "fieldname": "exchange_gain_loss_account",
+   "fieldtype": "Link",
+   "label": "Exchange Gain/Loss Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "column_break_curr1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "foreign_currency_revaluation_account",
+   "fieldtype": "Link",
+   "label": "Foreign Currency Revaluation Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "inter_company_clearing_account",
+   "fieldtype": "Link",
+   "label": "Inter Company Clearing Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "guardrail_section",
+   "fieldtype": "Section Break",
+   "label": "Guardrail"
+  },
+  {
+   "description": "Reserved for a later stage — not yet enforced anywhere.",
+   "fieldname": "earliest_allowed_posting_date",
+   "fieldtype": "Date",
+   "label": "Earliest Allowed Posting Date"
+  }
+ ],
+ "icon": "fa fa-table",
+ "idx": 0,
+ "index_web_pages_for_search": 0,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-09-18 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Blueline",
+ "name": "Company COA Mapping",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
