@@ -1,10 +1,11 @@
 {
  "actions": [],
- "autoname": "hash",
- "creation": "2026-09-18 00:00:00.000000",
+ "allow_rename": 0,
+ "autoname": "field:company",
+ "creation": "2026-09-19 00:00:00.000000",
+ "description": "One document per company holding its Chart of Accounts defaults. The document name is the company name, so each company can have only one configuration. Access is scoped per company through Frappe's native Company User Permissions.",
  "doctype": "DocType",
- "document_type": "Document",
- "editable_grid": 1,
+ "document_type": "Setup",
  "engine": "InnoDB",
  "field_order": [
   "financial_section",
@@ -36,12 +37,16 @@
    "label": "Financial & Balancing"
   },
   {
+   "description": "Cannot be changed after saving, because the document name is the company name.",
    "fieldname": "company",
    "fieldtype": "Link",
    "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Company",
    "options": "Company",
-   "reqd": 1
+   "reqd": 1,
+   "set_only_once": 1,
+   "unique": 1
   },
   {
    "fieldname": "default_cash_account",
@@ -150,18 +155,52 @@
    "label": "Earliest Allowed Posting Date"
   }
  ],
- "icon": "fa fa-table",
+ "icon": "fa fa-sitemap",
  "idx": 0,
  "index_web_pages_for_search": 0,
- "istable": 1,
+ "is_submittable": 0,
  "links": [],
- "modified": "2026-09-18 00:00:00.000000",
+ "modified": "2026-09-19 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Blueline",
- "name": "Company COA Mapping",
+ "name": "Company COA Configuration",
+ "naming_rule": "By fieldname",
  "owner": "Administrator",
- "permissions": [],
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Financial Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "All"
+  }
+ ],
+ "search_fields": "company",
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "track_changes": 1
 }

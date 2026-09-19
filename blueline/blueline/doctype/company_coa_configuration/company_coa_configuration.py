@@ -2,7 +2,7 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 
-# Account Link fields that must (a) belong to the row's company and (b) be leaf accounts.
+# Account Link fields that must (a) belong to this document's company and (b) be leaf accounts.
 ACCOUNT_FIELDS = (
 	"default_cash_account",
 	"default_bank_account",
@@ -15,7 +15,7 @@ ACCOUNT_FIELDS = (
 	"inter_company_clearing_account",
 )
 
-# Non-Account Link fields that must belong to the row's company (no leaf-account check).
+# Non-Account Link fields that must belong to this document's company (no leaf check).
 NON_ACCOUNT_COMPANY_FIELDS = {
 	"default_cost_center": "Cost Center",
 	"default_warehouse": "Warehouse",
@@ -36,48 +36,46 @@ FIELD_LABELS = {
 }
 
 
-class GlobalCOAMappingSettings(Document):
+class CompanyCOAConfiguration(Document):
 	def validate(self):
-		for row in self.company_mappings:
-			self.validate_row(row)
+		self.validate_account_fields()
+		self.validate_cost_center_and_warehouse()
+		self.set_default_valuation_method()
 
-	def validate_row(self, row):
-		if not row.company:
-			return
-
+	def validate_account_fields(self):
 		for fieldname in ACCOUNT_FIELDS:
-			value = row.get(fieldname)
+			value = self.get(fieldname)
 			if not value:
 				continue
 
 			account = frappe.db.get_value("Account", value, ["company", "is_group"], as_dict=True)
 
-			if account.company != row.company:
-				frappe.throw(
-					_('Row #{0}: {1} "{2}" does not belong to Company {3}').format(
-						row.idx, _(FIELD_LABELS[fieldname]), value, row.company
-					)
-				)
+			if account.company != self.company:
+				self.throw_wrong_company(fieldname, value)
 
 			if account.is_group:
 				frappe.throw(
-					_('Row #{0}: {1} "{2}" is a group account. Please select a leaf account.').format(
-						row.idx, _(FIELD_LABELS[fieldname]), value
+					_('{0} "{1}" is a group account. Please select a leaf account.').format(
+						_(FIELD_LABELS[fieldname]), value
 					)
 				)
 
+	def validate_cost_center_and_warehouse(self):
 		for fieldname, linked_doctype in NON_ACCOUNT_COMPANY_FIELDS.items():
-			value = row.get(fieldname)
+			value = self.get(fieldname)
 			if not value:
 				continue
 
-			record_company = frappe.db.get_value(linked_doctype, value, "company")
-			if record_company != row.company:
-				frappe.throw(
-					_('Row #{0}: {1} "{2}" does not belong to Company {3}').format(
-						row.idx, _(FIELD_LABELS[fieldname]), value, row.company
-					)
-				)
+			if frappe.db.get_value(linked_doctype, value, "company") != self.company:
+				self.throw_wrong_company(fieldname, value)
 
-		if not row.default_valuation_method:
-			row.default_valuation_method = "FIFO"
+	def throw_wrong_company(self, fieldname, value):
+		frappe.throw(
+			_('{0} "{1}" does not belong to Company {2}').format(
+				_(FIELD_LABELS[fieldname]), value, self.company
+			)
+		)
+
+	def set_default_valuation_method(self):
+		if not self.default_valuation_method:
+			self.default_valuation_method = "FIFO"
