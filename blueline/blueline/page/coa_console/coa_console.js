@@ -93,6 +93,18 @@ blueline.CoaConsole = class CoaConsole {
 					color: var(--text-color);
 					word-break: break-word;
 				}
+				.coa-console .coac-field-edit { align-items: center; padding: 4px 0; }
+				.coa-console .coac-field-control { flex: 1; min-width: 0; }
+				.coa-console .coac-field-control .frappe-control,
+				.coa-console .coac-field-control .form-group {
+					max-width: none;
+					margin-bottom: 0;
+				}
+				.coa-console .coac-panel-footer {
+					padding: 10px 15px;
+					text-align: right;
+					border-top: 1px solid var(--border-color);
+				}
 				.coa-console .coac-not-set { color: var(--text-muted); font-style: italic; }
 				.coa-console .coac-empty {
 					text-align: center;
@@ -138,8 +150,24 @@ blueline.CoaConsole = class CoaConsole {
 		}
 
 		configurations.forEach((config, index) => {
-			$panels.append(this.get_panel_html(config, index));
+			this.add_panel($panels, config, index);
 		});
+	}
+
+	add_panel($container, config, index) {
+		const $panel = $(this.get_panel_html(config, index).trim()).appendTo($container);
+		if (config.can_write) {
+			this.setup_edit_controls($panel, config, index);
+		}
+		return $panel;
+	}
+
+	replace_panel($panel, config, index) {
+		const $new_panel = $(this.get_panel_html(config, index).trim());
+		$panel.replaceWith($new_panel);
+		if (config.can_write) {
+			this.setup_edit_controls($new_panel, config, index);
+		}
 	}
 
 	render_access_indicator(can_write_any) {
@@ -156,14 +184,25 @@ blueline.CoaConsole = class CoaConsole {
 			? `<span class="coac-badge coac-badge-editable">${__("Editable")}</span>`
 			: `<span class="coac-badge coac-badge-readonly">${__("Read-only")}</span>`;
 
+		const editable = Boolean(config.can_write);
 		const sections = blueline.CoaConsole.SECTIONS.map(
 			(section) => `
 				<div class="coac-section">
 					<div class="coac-section-title">${__(section.title)}</div>
-					${section.fields.map((field) => this.get_field_html(config, field)).join("")}
+					${section.fields
+						.map((field) =>
+							editable ? this.get_edit_field_html(field) : this.get_field_html(config, field)
+						)
+						.join("")}
 				</div>
 			`
 		).join("");
+
+		const footer = editable
+			? `<div class="coac-panel-footer">
+					<button type="button" class="btn btn-primary btn-sm coac-save-btn">${__("Save")}</button>
+				</div>`
+			: "";
 
 		return `
 			<div class="col-lg-6 col-md-12 coac-panel-col">
@@ -173,9 +212,93 @@ blueline.CoaConsole = class CoaConsole {
 						${badge}
 					</div>
 					<div class="coac-panel-body">${sections}</div>
+					${footer}
 				</div>
 			</div>
 		`;
+	}
+
+	get_edit_field_html(field) {
+		return `
+			<div class="coac-field coac-field-edit">
+				<span class="coac-field-label">${__(field.label)}</span>
+				<div class="coac-field-control" data-fieldname="${field.fieldname}"></div>
+			</div>
+		`;
+	}
+
+	get_control_df(field, company) {
+		const df = {
+			fieldname: field.fieldname,
+			label: field.label,
+			fieldtype: field.fieldtype,
+			options: field.options,
+		};
+
+		if (field.fieldtype === "Link") {
+			// Same filters as the doctype form's set_query: this company only, and leaf
+			// accounts only. only_select hides the "Create a new ..." option in the picker.
+			const filters = { company: company };
+			if (field.options === "Account") {
+				filters.is_group = 0;
+			}
+			df.only_select = 1;
+			df.get_query = () => ({ filters: filters });
+		}
+
+		return df;
+	}
+
+	setup_edit_controls($panel, config, index) {
+		const controls = {};
+
+		blueline.CoaConsole.SECTIONS.forEach((section) => {
+			section.fields.forEach((field) => {
+				const $parent = $panel.find(`.coac-field-control[data-fieldname="${field.fieldname}"]`);
+				const control = frappe.ui.form.make_control({
+					df: this.get_control_df(field, config.company),
+					parent: $parent,
+					only_input: true,
+					render_input: true,
+				});
+				control.set_input(config[field.fieldname] || "");
+				controls[field.fieldname] = control;
+			});
+		});
+
+		$panel.find(".coac-save-btn").on("click", () => this.save_panel($panel, config, index, controls));
+	}
+
+	save_panel($panel, config, index, controls) {
+		const values = {};
+		Object.keys(controls).forEach((fieldname) => {
+			values[fieldname] = controls[fieldname].get_value() || "";
+		});
+
+		const $button = $panel.find(".coac-save-btn").prop("disabled", true);
+
+		frappe.call({
+			method: "blueline.blueline.page.coa_console.coa_console.save_configuration",
+			type: "POST",
+			args: { company: config.name, values: values },
+			callback: (r) => {
+				const result = r.message || {};
+				if (result.ok) {
+					frappe.show_alert({ message: result.message, indicator: "green" });
+					this.replace_panel($panel, result.configuration, index);
+				} else {
+					frappe.show_alert(
+						{
+							message: frappe.utils.escape_html(result.message || __("Could not save")),
+							indicator: "red",
+						},
+						10
+					);
+					$button.prop("disabled", false);
+				}
+			},
+			error: () => $button.prop("disabled", false),
+		});
 	}
 
 	get_field_html(config, field) {
@@ -202,31 +325,68 @@ blueline.CoaConsole.SECTIONS = [
 	{
 		title: "Financial & Balancing",
 		fields: [
-			{ fieldname: "default_cash_account", label: "Default Cash Account" },
-			{ fieldname: "default_bank_account", label: "Default Bank Account" },
-			{ fieldname: "temporary_opening_account", label: "Temporary Opening Account" },
-			{ fieldname: "default_cost_center", label: "Default Cost Center" },
+			{ fieldname: "default_cash_account", label: "Default Cash Account", fieldtype: "Link", options: "Account" },
+			{ fieldname: "default_bank_account", label: "Default Bank Account", fieldtype: "Link", options: "Account" },
+			{
+				fieldname: "temporary_opening_account",
+				label: "Temporary Opening Account",
+				fieldtype: "Link",
+				options: "Account",
+			},
+			{ fieldname: "default_cost_center", label: "Default Cost Center", fieldtype: "Link", options: "Cost Center" },
 		],
 	},
 	{
 		title: "Stock & Valuation",
 		fields: [
-			{ fieldname: "stock_adjustment_account", label: "Stock Adjustment Account" },
-			{ fieldname: "stock_received_but_not_billed", label: "Stock Received But Not Billed" },
-			{ fieldname: "expenses_included_in_valuation", label: "Expenses Included In Valuation" },
-			{ fieldname: "default_valuation_method", label: "Default Valuation Method" },
-			{ fieldname: "default_warehouse", label: "Default Warehouse" },
+			{
+				fieldname: "stock_adjustment_account",
+				label: "Stock Adjustment Account",
+				fieldtype: "Link",
+				options: "Account",
+			},
+			{
+				fieldname: "stock_received_but_not_billed",
+				label: "Stock Received But Not Billed",
+				fieldtype: "Link",
+				options: "Account",
+			},
+			{
+				fieldname: "expenses_included_in_valuation",
+				label: "Expenses Included In Valuation",
+				fieldtype: "Link",
+				options: "Account",
+			},
+			{
+				fieldname: "default_valuation_method",
+				label: "Default Valuation Method",
+				fieldtype: "Select",
+				options: "FIFO\nMoving Average",
+			},
+			{ fieldname: "default_warehouse", label: "Default Warehouse", fieldtype: "Link", options: "Warehouse" },
 		],
 	},
 	{
 		title: "Multi-Currency",
 		fields: [
-			{ fieldname: "exchange_gain_loss_account", label: "Exchange Gain/Loss Account" },
+			{
+				fieldname: "exchange_gain_loss_account",
+				label: "Exchange Gain/Loss Account",
+				fieldtype: "Link",
+				options: "Account",
+			},
 			{
 				fieldname: "foreign_currency_revaluation_account",
 				label: "Foreign Currency Revaluation Account",
+				fieldtype: "Link",
+				options: "Account",
 			},
-			{ fieldname: "inter_company_clearing_account", label: "Inter Company Clearing Account" },
+			{
+				fieldname: "inter_company_clearing_account",
+				label: "Inter Company Clearing Account",
+				fieldtype: "Link",
+				options: "Account",
+			},
 		],
 	},
 	{
@@ -236,6 +396,7 @@ blueline.CoaConsole.SECTIONS = [
 				fieldname: "earliest_allowed_posting_date",
 				label: "Earliest Allowed Posting Date",
 				type: "date",
+				fieldtype: "Date",
 			},
 		],
 	},
