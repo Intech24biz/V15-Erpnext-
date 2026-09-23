@@ -25,5 +25,32 @@
   "name": "Pending Approval",
   "style": "Warning",
   "workflow_state_name": "Pending Approval"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "",
+  "modified": "2026-09-23 00:00:00.000000",
+  "name": "Accrued",
+  "style": "",
+  "workflow_state_name": "Accrued"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "",
+  "modified": "2026-09-23 00:00:00.000000",
+  "name": "Payment Received - Pending Approval",
+  "style": "Warning",
+  "workflow_state_name": "Payment Received - Pending Approval"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "",
+  "modified": "2026-09-23 00:00:00.000000",
+  "name": "Paid",
+  "style": "Success",
+  "workflow_state_name": "Paid"
  }
 ]

@@ -21,17 +21,31 @@ fixtures = [
                 "GI Sales Dept 2",
                 "GI Tech Dept",
                 "Financial Manager",
+                "Technical Approver",
             ]],
         ],
     },
     {"doctype": "Workflow", "filters": [["name", "like", "GI %"]]},
     {
         "doctype": "Workflow State",
-        "filters": [["name", "in", ["Draft", "Pending Approval", "Approved"]]],
+        "filters": [["name", "in", [
+            "Draft",
+            "Pending Approval",
+            "Approved",
+            "Accrued",
+            "Payment Received - Pending Approval",
+            "Paid",
+        ]]],
     },
     {
         "doctype": "Workflow Action Master",
-        "filters": [["name", "in", ["Approve", "Submit", "Send for Approval"]]],
+        "filters": [["name", "in", [
+            "Approve",
+            "Submit",
+            "Send for Approval",
+            "Payment Received",
+            "Mark as Paid",
+        ]]],
     },
     {"doctype": "Notification", "filters": [["name", "like", "GI %"]]},
 ]
@@ -48,9 +62,14 @@ doc_events = {
             "blueline.server_scripts.tax_invoice_serial.generate_serial_number",
             "blueline.server_scripts.approval_enforcement.enforce_approval",
         ],
+        "on_submit": "blueline.server_scripts.sales_commission.create_commission_entries",
     },
     "Payment Entry": {
         "before_submit": "blueline.server_scripts.approval_enforcement.enforce_approval",
+        "on_submit": "blueline.server_scripts.sales_commission.release_commission_entries",
+        # Payment Reconciliation can update an already-submitted Payment Entry's
+        # references without re-firing on_submit; this catches that path too.
+        "on_update_after_submit": "blueline.server_scripts.sales_commission.release_commission_entries",
     },
     "Customer": {
         "after_insert": "blueline.server_scripts.customer_master.save_customer_tin",

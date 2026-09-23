@@ -1,0 +1,354 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "format:SCE-{#####}",
+ "creation": "2026-09-23 00:00:00.000000",
+ "description": "One row of accrued sales commission for a single Sales Invoice line, created automatically on Sales Invoice submit. Not intended to be created or edited by hand except by System Manager for corrections.",
+ "doctype": "DocType",
+ "document_type": "Document",
+ "engine": "InnoDB",
+ "field_order": [
+  "reference_section",
+  "sales_invoice",
+  "sales_invoice_item",
+  "posting_date",
+  "column_break_ref1",
+  "payment_entry",
+  "parties_section",
+  "sales_person",
+  "customer",
+  "column_break_parties1",
+  "item_code",
+  "company",
+  "line_section",
+  "qty",
+  "rate",
+  "column_break_line1",
+  "amount",
+  "commission_section",
+  "commission_rule",
+  "commission_type",
+  "column_break_comm1",
+  "commission_amount",
+  "approval_section",
+  "status",
+  "column_break_appr1",
+  "approved_by_management",
+  "approved_by_technical"
+ ],
+ "fields": [
+  {
+   "fieldname": "reference_section",
+   "fieldtype": "Section Break",
+   "label": "Source Reference"
+  },
+  {
+   "fieldname": "sales_invoice",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Sales Invoice",
+   "options": "Sales Invoice",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "description": "Name of the Sales Invoice Item row this commission was calculated from.",
+   "fieldname": "sales_invoice_item",
+   "fieldtype": "Data",
+   "label": "Invoice Item Row",
+   "read_only": 1
+  },
+  {
+   "fieldname": "posting_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Posting Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_ref1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "payment_entry",
+   "fieldtype": "Link",
+   "label": "Payment Entry",
+   "options": "Payment Entry",
+   "permlevel": 3,
+   "read_only": 1
+  },
+  {
+   "fieldname": "parties_section",
+   "fieldtype": "Section Break",
+   "label": "Sales Person & Item"
+  },
+  {
+   "fieldname": "sales_person",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Sales Person",
+   "options": "Sales Person",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Customer",
+   "options": "Customer",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_parties1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Item Code",
+   "options": "Item",
+   "read_only": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Company",
+   "options": "Company",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "line_section",
+   "fieldtype": "Section Break",
+   "label": "Invoice Line"
+  },
+  {
+   "fieldname": "qty",
+   "fieldtype": "Float",
+   "label": "Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "rate",
+   "fieldtype": "Currency",
+   "label": "Rate",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_line1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Line amount (qty x rate) from the Sales Invoice, before commission.",
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "label": "Line Amount",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "commission_section",
+   "fieldtype": "Section Break",
+   "label": "Commission"
+  },
+  {
+   "fieldname": "commission_rule",
+   "fieldtype": "Link",
+   "label": "Commission Rule",
+   "options": "Sales Commission Rule",
+   "read_only": 1
+  },
+  {
+   "fieldname": "commission_type",
+   "fieldtype": "Select",
+   "label": "Commission Type",
+   "options": "Fixed Amount Per Unit\nPercentage of Line Value",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_comm1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "commission_amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Commission Amount",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "approval_section",
+   "fieldtype": "Section Break",
+   "label": "Status & Approval"
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "Accrued",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Accrued\nPayment Received - Pending Approval\nApproved\nPaid\nCancelled",
+   "permlevel": 3,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_appr1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "description": "Only System Manager or Financial Manager can set this.",
+   "fieldname": "approved_by_management",
+   "fieldtype": "Check",
+   "label": "Approved by Management",
+   "permlevel": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "description": "Only the Technical Approver role can set this.",
+   "fieldname": "approved_by_technical",
+   "fieldtype": "Check",
+   "label": "Approved by Technical",
+   "permlevel": 2
+  }
+ ],
+ "icon": "fa fa-money",
+ "idx": 0,
+ "index_web_pages_for_search": 0,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-09-23 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Blueline",
+ "name": "Sales Commission Entry",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "permlevel": 1,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  },
+  {
+   "permlevel": 2,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  },
+  {
+   "permlevel": 3,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Financial Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "permlevel": 1,
+   "read": 1,
+   "role": "Financial Manager",
+   "write": 1
+  },
+  {
+   "permlevel": 2,
+   "read": 1,
+   "role": "Financial Manager"
+  },
+  {
+   "permlevel": 3,
+   "read": 1,
+   "role": "Financial Manager"
+  },
+  {
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Technical Approver",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "permlevel": 1,
+   "read": 1,
+   "role": "Technical Approver"
+  },
+  {
+   "permlevel": 2,
+   "read": 1,
+   "role": "Technical Approver",
+   "write": 1
+  },
+  {
+   "permlevel": 3,
+   "read": 1,
+   "role": "Technical Approver"
+  },
+  {
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "All"
+  },
+  {
+   "permlevel": 1,
+   "read": 1,
+   "role": "All"
+  },
+  {
+   "permlevel": 2,
+   "read": 1,
+   "role": "All"
+  },
+  {
+   "permlevel": 3,
+   "read": 1,
+   "role": "All"
+  }
+ ],
+ "search_fields": "sales_invoice,sales_person,customer,company,status",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

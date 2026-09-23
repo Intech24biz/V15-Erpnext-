@@ -303,5 +303,58 @@
   "slack_webhook_url": null,
   "subject": "Petty Cash Voucher {{ doc.name }} pending your approval",
   "value_changed": "workflow_state"
+ },
+ {
+  "attach_files": "",
+  "attach_print": 0,
+  "channel": "System Notification",
+  "condition": "doc.status == 'Payment Received - Pending Approval'",
+  "date_changed": null,
+  "days_in_advance": 0,
+  "docstatus": 0,
+  "doctype": "Notification",
+  "document_type": "Sales Commission Entry",
+  "enabled": 1,
+  "event": "Value Change",
+  "from_attach_field": null,
+  "is_standard": 0,
+  "message": "<p>A sales commission entry has been paid and is awaiting your approval. Both Management and Technical sign-off are required before it can be paid out.</p>\n<p><b>Entry:</b> {{ doc.name }}<br>\n<b>Sales Invoice:</b> {{ doc.sales_invoice }}<br>\n<b>Company:</b> {{ doc.company }}<br>\n<b>Sales Person:</b> {{ doc.sales_person }}<br>\n<b>Commission Amount:</b> {{ doc.get_formatted('commission_amount') }}</p>\n<p>Please review and approve in the system.</p>",
+  "message_type": "Markdown",
+  "method": null,
+  "modified": "2026-09-23 00:00:00.000000",
+  "module": null,
+  "name": "GI Sales Commission Pending Approval",
+  "print_format": null,
+  "property_value": null,
+  "recipients": [
+   {
+    "bcc": null,
+    "cc": null,
+    "condition": null,
+    "parent": "GI Sales Commission Pending Approval",
+    "parentfield": "recipients",
+    "parenttype": "Notification",
+    "receiver_by_document_field": null,
+    "receiver_by_role": "Financial Manager"
+   },
+   {
+    "bcc": null,
+    "cc": null,
+    "condition": null,
+    "parent": "GI Sales Commission Pending Approval",
+    "parentfield": "recipients",
+    "parenttype": "Notification",
+    "receiver_by_document_field": null,
+    "receiver_by_role": "Technical Approver"
+   }
+  ],
+  "send_system_notification": 1,
+  "send_to_all_assignees": 0,
+  "sender": null,
+  "sender_email": null,
+  "set_property_after_alert": null,
+  "slack_webhook_url": null,
+  "subject": "Sales Commission Entry {{ doc.name }} pending your approval",
+  "value_changed": "status"
  }
 ]
