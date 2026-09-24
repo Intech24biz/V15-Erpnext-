@@ -73,7 +73,7 @@ _K1 (Financial Manager's "Mark as Paid" silently failing) and K2 (wrong-role app
 | K12 | **An approved Credit Note can still be cancelled** (it has no Tax Invoice Serial, so the cancel block doesn't apply to it). Pending client confirmation. Cancelling it now also restores the commission it adjusted (2.9 E). | Sections 2.9, 3.7 |
 | K13 | **Deduction entries have no payout step yet.** A Deduction is created in **Payment Received - Pending Approval** and is approved like any commission entry (two different people). After that it stays **Approved**: **Mark as Paid** refuses it, and it shows as outstanding on the Sales Commission Register until netting against a payout is built. | Section 2.9 |
 | K7 | **The VAT Dashboard page does not show the list of VAT accounts** — only totals, a chart and a monthly table. To see which accounts it uses, use the read-only URL in Section 5.4. | Section 5 |
-| K8 | **"Earliest Allowed Posting Date" on the COA configuration is not enforced yet** (that guard is not deployed). You can fill it in, but nothing will block back-dated postings. Don't test enforcement. | Section 1 |
+| ~~K8~~ | **Resolved (branch `feature/posting-date-guard-v2`).** "Earliest Allowed Posting Date" is enforced on the server for every ledger-posting document — see 1.6. | Section 1 |
 | K9 | **Blueline Enterprises has no default cash/bank account set**, so on Payment Entries you must pick "Account Paid To" by hand. (Filling "Default Cash Account" in the COA console is part of the long-term fix.) | Sections 2, 3 |
 
 ### 0.6 Where everything lives
@@ -123,7 +123,7 @@ The console itself has **no "create" button** — new configurations are created
    | Multi-Currency | Exchange Gain/Loss Account | that company's exchange gain/loss account |
    | | Foreign Currency Revaluation Account | optional |
    | | Inter Company Clearing Account | optional |
-   | Guardrail | Earliest Allowed Posting Date | optional — **not enforced yet (K8)** |
+   | Guardrail | Earliest Allowed Posting Date | optional — leave empty here; tested in 1.6 |
 
 3. Click **Save** (or Ctrl+S).
 4. **Expected:** "Saved" toast; the record name becomes the company name.
@@ -173,6 +173,16 @@ Goal: a user restricted to one company sees only that company's configuration.
 5. As Administrator, edit that User Permission → change **For Value** to the company you configured → Save.
 6. As `coa.test@...` → **Refresh** the console. **Expected:** that one company's panel, **"Read-only"** badge (they have no Financial Manager role), no Save.
 7. **Cleanup:** delete the User Permission (`/app/user-permission`, filter by user → open → ⋯ → Delete), then disable the test user (open user → untick **Enabled** → Save) or delete it.
+
+### 1.6 Earliest Allowed Posting Date — [REVERSIBLE: drafts only, deleted afterwards; set the date back to empty at the end]
+
+1. As **Administrator**, in the COA console set Blueline's **Earliest Allowed Posting Date** to **today** → Save.
+2. As `tech@gen-innov.com`: new **Journal Entry** for Blueline, **Posting Date** yesterday, two lines of Rs. 1 → **Save**. **Expected:** refused — *"Journal Entry cannot be dated … for company Blueline Enterprises Pvt Ltd: postings before … are not allowed. Contact a System Manager if this document genuinely needs to be backdated."*
+3. Change the date to today → **Save**. **Expected:** saves (Draft). Delete it.
+4. Same check on a Sales Invoice (tick **Edit Posting Date and Time**) and a Petty Cash Voucher. **Expected:** the same refusal for yesterday.
+5. **System Manager override:** as `ceo@gen-innov.com`, save a Journal Entry dated yesterday. **Expected:** saves; the timeline shows *"Posting date override: ceo@gen-innov.com saved this Journal Entry with posting_date = … before the configured earliest allowed posting date …"*. Delete the draft.
+6. **Cleanup:** clear the Earliest Allowed Posting Date (or set the date the accountant wants) → Save.
+7. **Wrong results:** a back-dated document saves for a non–System Manager; the override leaves no comment.
 
 ---
 

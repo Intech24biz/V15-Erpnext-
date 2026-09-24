@@ -149,7 +149,7 @@
    "label": "Guardrail"
   },
   {
-   "description": "Reserved for a later stage — not yet enforced anywhere.",
+   "description": "Documents that post to this company's ledger can't be dated before this. A System Manager may override; the override is recorded on the document.",
    "fieldname": "earliest_allowed_posting_date",
    "fieldtype": "Date",
    "label": "Earliest Allowed Posting Date"
