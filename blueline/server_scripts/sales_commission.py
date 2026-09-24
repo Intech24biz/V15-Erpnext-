@@ -12,6 +12,13 @@ ACCRUED_STATUS = "Accrued"
 PENDING_APPROVAL_STATUS = "Payment Received - Pending Approval"
 APPROVED_STATUS = "Approved"
 PAID_STATUS = "Paid"
+CANCELLED_STATUS = "Cancelled"
+
+# Cancelling the invoice is safe to cascade automatically: no sign-off or payout exists yet.
+AUTO_CANCEL_STATUSES = {ACCRUED_STATUS, PENDING_APPROVAL_STATUS}
+# Cancelling the invoice is blocked instead: money and/or approval are already committed,
+# so unwinding this needs a human finance decision, not a silent cascade.
+BLOCK_CANCEL_STATUSES = {APPROVED_STATUS, PAID_STATUS}
 
 # Same roles that hold permlevel-3 write on Sales Commission Entry (status/payment_entry).
 MARK_PAID_ROLES = {"System Manager", "Financial Manager"}
@@ -162,6 +169,60 @@ def _release_entries_for_invoice(invoice_name):
 			frappe.log_error(
 				title=f"Sales Commission release failed: {entry_name}",
 				message=frappe.get_traceback(),
+			)
+
+
+def guard_commission_entries_on_cancel(doc, method=None):
+	"""Sales Invoice `before_cancel`: nothing else propagates an invoice cancellation to
+	its commission entries on its own, so without this a cancelled invoice could leave
+	an Approved or even Paid commission entry behind with no trace back to a live
+	invoice. Runs before the cancel is persisted, so a throw here aborts the invoice
+	cancellation entirely.
+
+	- Accrued / Payment Received - Pending Approval: no sign-off or payout exists yet,
+	  so these are cancelled automatically along with the invoice.
+	- Approved / Paid: money and/or approval are already committed. Cancelling those
+	  silently would desync the commission record from a ledger event that no longer
+	  exists, so this blocks the invoice cancellation instead and requires a human
+	  finance decision first.
+	"""
+	# get_all, matching _release_entries_for_invoice above: these are the system's own
+	# records for this specific invoice, not a user-facing filtered view.
+	entries = frappe.get_all(
+		ENTRY_DOCTYPE,
+		filters={"sales_invoice": doc.name, "docstatus": 1},
+		fields=["name", "status"],
+	)
+	if not entries:
+		return
+
+	blocking = [e.name for e in entries if e.status in BLOCK_CANCEL_STATUSES]
+	if blocking:
+		frappe.throw(
+			_(
+				"Cannot cancel {0}: linked Sales Commission Entries {1} have already been "
+				"approved or paid. Resolve those commission entries first."
+			).format(doc.name, ", ".join(blocking))
+		)
+
+	for entry in entries:
+		if entry.status not in AUTO_CANCEL_STATUSES:
+			continue
+		try:
+			commission_entry = frappe.get_doc(ENTRY_DOCTYPE, entry.name)
+			commission_entry.flags.ignore_permissions = True
+			commission_entry.cancel()
+		except Exception:
+			frappe.log_error(
+				title=f"Sales Commission auto-cancel failed: {entry.name}",
+				message=frappe.get_traceback(),
+			)
+			# Don't leave the invoice cancelled with a commission entry that failed to
+			# follow it — better to block and surface the problem than to silently drift.
+			frappe.throw(
+				_("Could not cancel linked Sales Commission Entry {0}. See Error Log.").format(
+					entry.name
+				)
 			)
 
 

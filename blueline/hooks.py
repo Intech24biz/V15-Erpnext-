@@ -63,6 +63,7 @@ doc_events = {
             "blueline.server_scripts.approval_enforcement.enforce_approval",
         ],
         "on_submit": "blueline.server_scripts.sales_commission.create_commission_entries",
+        "before_cancel": "blueline.server_scripts.sales_commission.guard_commission_entries_on_cancel",
     },
     "Payment Entry": {
         "before_submit": "blueline.server_scripts.approval_enforcement.enforce_approval",
