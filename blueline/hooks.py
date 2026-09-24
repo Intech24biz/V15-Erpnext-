@@ -48,6 +48,7 @@ fixtures = [
         ]]],
     },
     {"doctype": "Notification", "filters": [["name", "like", "GI %"]]},
+    {"doctype": "Workspace", "filters": [["name", "=", "Blueline Control Center"]]},
 ]
 
 doc_events = {
