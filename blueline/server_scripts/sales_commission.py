@@ -25,38 +25,52 @@ MARK_PAID_ROLES = {"System Manager", "Financial Manager"}
 
 
 def create_commission_entries(doc, method=None):
-	"""Sales Invoice `on_submit`: accrue commission for every (item row x sales person)
-	pair that matches an enabled Sales Commission Rule. A line with no matching rule is
-	logged and skipped — this must never block the invoice submission itself.
+	"""Sales Invoice `on_submit`: accrue commission for every item row that matches an
+	enabled Sales Commission Rule. Matching is driven purely by item_code (+ customer)
+	against the rule table — the invoice's own Sales Team table is deliberately ignored,
+	so no manual sales-person selection on the invoice ever affects who is credited.
+	A line with no matching rule is logged and skipped — this must never block the
+	invoice submission itself.
 	"""
-	sales_team = [row for row in (doc.sales_team or []) if row.sales_person]
-	if not sales_team:
-		return
-
 	for item in doc.items:
-		for team_row in sales_team:
-			try:
-				_process_line(doc, item, team_row.sales_person)
-			except Exception:
-				frappe.log_error(
-					title=f"Sales Commission accrual failed: {doc.name} / {item.item_code} / {team_row.sales_person}",
-					message=frappe.get_traceback(),
-				)
+		try:
+			_process_line(doc, item)
+		except Exception:
+			frappe.log_error(
+				title=f"Sales Commission accrual failed: {doc.name} / {item.item_code}",
+				message=frappe.get_traceback(),
+			)
 
 
-def _process_line(invoice, item, sales_person):
-	rule = _find_matching_rule(invoice.company, sales_person, invoice.customer, item.item_code)
-	if not rule:
+def _process_line(invoice, item):
+	rules = _find_matching_rules(invoice.company, invoice.customer, item.item_code)
+	if not rules:
 		frappe.log_error(
-			title=f"Sales Commission: no matching rule ({invoice.name} / {item.item_code} / {sales_person})",
+			title=f"Sales Commission: no matching rule ({invoice.name} / {item.item_code})",
 			message=(
 				f"No enabled Sales Commission Rule matched Company={invoice.company}, "
-				f"Sales Person={sales_person}, Customer={invoice.customer}, Item={item.item_code}. "
+				f"Customer={invoice.customer}, Item={item.item_code}. "
 				"No commission was accrued for this invoice line."
 			),
 		)
 		return
 
+	if len(rules) > 1:
+		# Two reps' rules tie at the same priority tier. Picking one would silently credit
+		# the wrong person at the wrong rate, so skip and surface it for a human to fix
+		# (Sales Commission Rule validation prevents new ties; this catches legacy ones).
+		frappe.log_error(
+			title=f"Sales Commission: ambiguous rules ({invoice.name} / {item.item_code})",
+			message=(
+				f"More than one enabled Sales Commission Rule matched Company={invoice.company}, "
+				f"Customer={invoice.customer}, Item={item.item_code} at the same priority: "
+				f"{', '.join(f'{r.name} ({r.sales_person})' for r in rules)}. "
+				"Disable all but one. No commission was accrued for this invoice line."
+			),
+		)
+		return
+
+	rule = rules[0]
 	commission_amount = _calculate_commission(rule, item)
 
 	entry = frappe.get_doc(
@@ -65,7 +79,8 @@ def _process_line(invoice, item, sales_person):
 			"sales_invoice": invoice.name,
 			"sales_invoice_item": item.name,
 			"posting_date": invoice.posting_date,
-			"sales_person": sales_person,
+			"matched_sales_person": rule.sales_person,
+			"commission_credited_to": resolve_commission_leader(rule.sales_person),
 			"customer": invoice.customer,
 			"item_code": item.item_code,
 			"company": invoice.company,
@@ -84,9 +99,10 @@ def _process_line(invoice, item, sales_person):
 	entry.submit()
 
 
-def _find_matching_rule(company, sales_person, customer, item_code):
-	"""(sales_person+customer+item_code) > (sales_person+item_code) >
-	(sales_person+customer) > (sales_person only), all scoped to company.
+def _find_matching_rules(company, customer, item_code):
+	"""(customer+item_code) > (item_code only) > (customer only) > (catch-all: blank
+	customer and item_code), all scoped to company. Returns the rules at the first tier
+	that has any match (normally exactly one; more than one means an ambiguous setup).
 	A blank customer/item_code on the rule means "any" — matched here as an explicit
 	empty-string filter, not as "ignore this filter".
 	"""
@@ -104,18 +120,31 @@ def _find_matching_rule(company, sales_person, customer, item_code):
 		# for will see no rules here (same trade-off as the rest of this feature).
 		rules = frappe.get_list(
 			RULE_DOCTYPE,
-			filters={
-				"sales_person": sales_person,
-				"company": company,
-				"enabled": 1,
-				**tier,
-			},
-			fields=["name", "commission_type", "rate"],
-			limit=1,
+			filters={"company": company, "enabled": 1, **tier},
+			fields=["name", "sales_person", "commission_type", "rate"],
+			limit=2,
 		)
 		if rules:
-			return rules[0]
-	return None
+			return rules
+	return []
+
+
+def resolve_commission_leader(sales_person):
+	"""Commission is credited to the top-level group a rep sits under, not the rep.
+	Walks up parent_sales_person while the parent is a group (is_group = 1); a rep with
+	no group parent is credited to themselves. Walks rather than doing a single lookup
+	because the live tree has reps two levels down (rep -> sub-group -> team).
+	"""
+	credited_to = sales_person
+	seen = {sales_person}
+	while True:
+		parent = frappe.db.get_value("Sales Person", credited_to, "parent_sales_person")
+		if not parent or parent in seen:
+			return credited_to
+		if not frappe.db.get_value("Sales Person", parent, "is_group"):
+			return credited_to
+		seen.add(parent)
+		credited_to = parent
 
 
 def _calculate_commission(rule, item):

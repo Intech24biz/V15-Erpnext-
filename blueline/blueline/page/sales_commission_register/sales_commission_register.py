@@ -8,7 +8,8 @@ FIELDS = [
 	"name",
 	"sales_invoice",
 	"posting_date",
-	"sales_person",
+	"matched_sales_person",
+	"commission_credited_to",
 	"customer",
 	"item_code",
 	"company",
@@ -37,14 +38,23 @@ def _check_permission():
 
 
 @frappe.whitelist()
-def get_entries(status=None, sales_person=None, company=None, from_date=None, to_date=None):
+def get_entries(
+	status=None,
+	matched_sales_person=None,
+	commission_credited_to=None,
+	company=None,
+	from_date=None,
+	to_date=None,
+):
 	_check_permission()
 
 	filters = {}
 	if status:
 		filters["status"] = status
-	if sales_person:
-		filters["sales_person"] = sales_person
+	if matched_sales_person:
+		filters["matched_sales_person"] = matched_sales_person
+	if commission_credited_to:
+		filters["commission_credited_to"] = commission_credited_to
 	if company:
 		filters["company"] = company
 	if from_date and to_date:

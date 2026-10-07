@@ -36,9 +36,17 @@ blueline.SalesCommissionRegister = class SalesCommissionRegister {
 			change: () => me.refresh(),
 		});
 
-		this.sales_person_field = this.page.add_field({
-			fieldname: "sales_person",
-			label: __("Sales Person"),
+		this.matched_sales_person_field = this.page.add_field({
+			fieldname: "matched_sales_person",
+			label: __("Matched Sales Person"),
+			fieldtype: "Link",
+			options: "Sales Person",
+			change: () => me.refresh(),
+		});
+
+		this.commission_credited_to_field = this.page.add_field({
+			fieldname: "commission_credited_to",
+			label: __("Credited To"),
 			fieldtype: "Link",
 			options: "Sales Person",
 			change: () => me.refresh(),
@@ -73,7 +81,8 @@ blueline.SalesCommissionRegister = class SalesCommissionRegister {
 	get_filter_values() {
 		return {
 			status: this.status_field.get_value(),
-			sales_person: this.sales_person_field.get_value(),
+			matched_sales_person: this.matched_sales_person_field.get_value(),
+			commission_credited_to: this.commission_credited_to_field.get_value(),
 			company: this.company_field.get_value(),
 			from_date: this.from_date_field.get_value(),
 			to_date: this.to_date_field.get_value(),
@@ -199,7 +208,8 @@ blueline.SalesCommissionRegister = class SalesCommissionRegister {
 						<th>${__("Entry")}</th>
 						<th>${__("Sales Invoice")}</th>
 						<th>${__("Posting Date")}</th>
-						<th>${__("Sales Person")}</th>
+						<th>${__("Matched Sales Person")}</th>
+						<th>${__("Credited To")}</th>
 						<th>${__("Customer")}</th>
 						<th>${__("Item")}</th>
 						<th>${__("Company")}</th>
@@ -221,7 +231,8 @@ blueline.SalesCommissionRegister = class SalesCommissionRegister {
 					<td><a href="/app/sales-commission-entry/${encodeURIComponent(row.name)}">${frappe.utils.escape_html(row.name)}</a></td>
 					<td><a href="/app/sales-invoice/${encodeURIComponent(row.sales_invoice)}">${frappe.utils.escape_html(row.sales_invoice || "")}</a></td>
 					<td>${row.posting_date ? frappe.datetime.str_to_user(row.posting_date) : ""}</td>
-					<td>${frappe.utils.escape_html(row.sales_person || "")}</td>
+					<td>${frappe.utils.escape_html(row.matched_sales_person || "")}</td>
+					<td>${frappe.utils.escape_html(row.commission_credited_to || "")}</td>
 					<td>${frappe.utils.escape_html(row.customer || "")}</td>
 					<td>${frappe.utils.escape_html(row.item_code || "")}</td>
 					<td>${frappe.utils.escape_html(row.company || "")}</td>

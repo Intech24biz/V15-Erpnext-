@@ -15,7 +15,8 @@
   "column_break_ref1",
   "payment_entry",
   "parties_section",
-  "sales_person",
+  "matched_sales_person",
+  "commission_credited_to",
   "customer",
   "column_break_parties1",
   "item_code",
@@ -86,11 +87,23 @@
    "label": "Sales Person & Item"
   },
   {
-   "fieldname": "sales_person",
+   "description": "The Sales Person on the Sales Commission Rule that matched this line, i.e. who actually made the sale.",
+   "fieldname": "matched_sales_person",
    "fieldtype": "Link",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "Sales Person",
+   "label": "Matched Sales Person",
+   "options": "Sales Person",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "description": "Who this commission is credited to: the top-level Sales Person group above the matched sales person, or the matched sales person themselves if they have no group parent. Any split among the group's members is handled outside the system.",
+   "fieldname": "commission_credited_to",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Commission Credited To",
    "options": "Sales Person",
    "read_only": 1,
    "reqd": 1
@@ -229,7 +242,7 @@
  "index_web_pages_for_search": 0,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-09-23 00:00:00.000000",
+ "modified": "2026-10-08 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Blueline",
  "name": "Sales Commission Entry",
@@ -346,7 +359,7 @@
    "role": "All"
   }
  ],
- "search_fields": "sales_invoice,sales_person,customer,company,status",
+ "search_fields": "sales_invoice,matched_sales_person,commission_credited_to,customer,company,status",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
