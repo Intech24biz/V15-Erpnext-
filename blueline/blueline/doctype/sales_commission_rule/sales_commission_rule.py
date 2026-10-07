@@ -9,25 +9,24 @@ class SalesCommissionRule(Document):
 			self.check_duplicate()
 
 	def check_duplicate(self):
-		# Same customer + item_code + company, across ALL sales persons: commission is
-		# matched on item/customer alone, so two enabled rules here would make the
-		# accrual hook unable to tell who made the sale. Blank customer/item_code is
-		# included literally, since "" means "any" and is itself a specific combination.
+		# One enabled rule per sales_person + customer + item_code + company. Several
+		# sales persons may share a customer/item combination (a sale can pay several
+		# people), but one person can't have two rates for the same combination. Blank
+		# customer/item_code is included literally, since "" means "any" and is itself a
+		# specific combination.
 		filters = {
+			"sales_person": self.sales_person,
 			"customer": self.customer or "",
 			"item_code": self.item_code or "",
 			"company": self.company,
 			"enabled": 1,
 			"name": ["!=", self.name or ""],
 		}
-		duplicate = frappe.get_list(
-			"Sales Commission Rule", filters=filters, fields=["name", "sales_person"], limit=1
-		)
+		duplicate = frappe.get_list("Sales Commission Rule", filters=filters, limit=1, pluck="name")
 		if duplicate:
 			frappe.throw(
 				_(
-					"Another enabled Sales Commission Rule ({0}, Sales Person {1}) already exists "
-					"for this Customer, Item and Company combination. Only one Sales Person can "
-					"be matched per combination."
-				).format(duplicate[0].name, duplicate[0].sales_person)
+					"Another enabled Sales Commission Rule ({0}) already exists for this "
+					"Sales Person, Customer, Item and Company combination."
+				).format(duplicate[0])
 			)

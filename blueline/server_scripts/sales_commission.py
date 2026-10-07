@@ -29,8 +29,9 @@ def create_commission_entries(doc, method=None):
 	enabled Sales Commission Rule. Matching is driven purely by item_code (+ customer)
 	against the rule table — the invoice's own Sales Team table is deliberately ignored,
 	so no manual sales-person selection on the invoice ever affects who is credited.
-	A line with no matching rule is logged and skipped — this must never block the
-	invoice submission itself.
+	One sale can pay several people: every rule at the first matching tier gets its own
+	entry. A line with no matching rule is logged and skipped — this must never block
+	the invoice submission itself.
 	"""
 	for item in doc.items:
 		try:
@@ -55,24 +56,35 @@ def _process_line(invoice, item):
 		)
 		return
 
-	if len(rules) > 1:
-		# Two reps' rules tie at the same priority tier. Picking one would silently credit
-		# the wrong person at the wrong rate, so skip and surface it for a human to fix
-		# (Sales Commission Rule validation prevents new ties; this catches legacy ones).
-		frappe.log_error(
-			title=f"Sales Commission: ambiguous rules ({invoice.name} / {item.item_code})",
-			message=(
-				f"More than one enabled Sales Commission Rule matched Company={invoice.company}, "
-				f"Customer={invoice.customer}, Item={item.item_code} at the same priority: "
-				f"{', '.join(f'{r.name} ({r.sales_person})' for r in rules)}. "
-				"Disable all but one. No commission was accrued for this invoice line."
-			),
-		)
-		return
+	by_person = {}
+	for rule in rules:
+		by_person.setdefault(rule.sales_person, []).append(rule)
 
-	rule = rules[0]
-	commission_amount = _calculate_commission(rule, item)
+	for sales_person, person_rules in by_person.items():
+		if len(person_rules) > 1:
+			# Sales Commission Rule.validate() forbids this (one enabled rule per sales
+			# person + customer + item + company), so reaching here is a data bug. There is
+			# no correct rate to pick, so this person is skipped; other payees still accrue.
+			frappe.log_error(
+				title=f"Sales Commission: duplicate rules for {sales_person} ({invoice.name} / {item.item_code})",
+				message=(
+					f"{len(person_rules)} enabled Sales Commission Rules for {sales_person} matched "
+					f"Company={invoice.company}, Customer={invoice.customer}, Item={item.item_code} at the "
+					f"same priority: {', '.join(r.name for r in person_rules)}. This violates the rule "
+					"uniqueness check. No commission was accrued for this person on this line."
+				),
+			)
+			continue
+		try:
+			_create_entry(invoice, item, person_rules[0])
+		except Exception:
+			frappe.log_error(
+				title=f"Sales Commission accrual failed: {invoice.name} / {item.item_code} / {sales_person}",
+				message=frappe.get_traceback(),
+			)
 
+
+def _create_entry(invoice, item, rule):
 	entry = frappe.get_doc(
 		{
 			"doctype": ENTRY_DOCTYPE,
@@ -89,7 +101,7 @@ def _process_line(invoice, item):
 			"amount": item.amount,
 			"commission_rule": rule.name,
 			"commission_type": rule.commission_type,
-			"commission_amount": commission_amount,
+			"commission_amount": _calculate_commission(rule, item),
 			"status": ACCRUED_STATUS,
 		}
 	)
@@ -101,8 +113,8 @@ def _process_line(invoice, item):
 
 def _find_matching_rules(company, customer, item_code):
 	"""(customer+item_code) > (item_code only) > (customer only) > (catch-all: blank
-	customer and item_code), all scoped to company. Returns the rules at the first tier
-	that has any match (normally exactly one; more than one means an ambiguous setup).
+	customer and item_code), all scoped to company. Returns every rule at the first tier
+	that has any match — one per payee when a sale pays several people.
 	A blank customer/item_code on the rule means "any" — matched here as an explicit
 	empty-string filter, not as "ignore this filter".
 	"""
@@ -122,7 +134,8 @@ def _find_matching_rules(company, customer, item_code):
 			RULE_DOCTYPE,
 			filters={"company": company, "enabled": 1, **tier},
 			fields=["name", "sales_person", "commission_type", "rate"],
-			limit=2,
+			order_by="sales_person asc, name asc",
+			limit_page_length=0,
 		)
 		if rules:
 			return rules
