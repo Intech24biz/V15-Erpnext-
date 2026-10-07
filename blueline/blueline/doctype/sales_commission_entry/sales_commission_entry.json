@@ -98,7 +98,7 @@
    "reqd": 1
   },
   {
-   "description": "Who this commission is credited to: the top-level Sales Person group above the matched sales person, or the matched sales person themselves if they have no group parent. Any split among the group's members is handled outside the system.",
+   "description": "Who this commission is credited to: the matched sales person's direct parent if that parent is a group (one level only, never further up), otherwise the matched sales person themselves. Any split among the group's members is handled outside the system.",
    "fieldname": "commission_credited_to",
    "fieldtype": "Link",
    "in_list_view": 1,

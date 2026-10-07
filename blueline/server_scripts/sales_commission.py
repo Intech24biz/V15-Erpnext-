@@ -130,21 +130,15 @@ def _find_matching_rules(company, customer, item_code):
 
 
 def resolve_commission_leader(sales_person):
-	"""Commission is credited to the top-level group a rep sits under, not the rep.
-	Walks up parent_sales_person while the parent is a group (is_group = 1); a rep with
-	no group parent is credited to themselves. Walks rather than doing a single lookup
-	because the live tree has reps two levels down (rep -> sub-group -> team).
+	"""Commission is credited to the rep's nearest group: their direct parent_sales_person
+	if that parent is a group (is_group = 1), otherwise the rep themselves. Deliberately
+	one level only — a sub-team lead keeps and distributes commission for their own
+	sub-team, so this must not roll further up to the team above them.
 	"""
-	credited_to = sales_person
-	seen = {sales_person}
-	while True:
-		parent = frappe.db.get_value("Sales Person", credited_to, "parent_sales_person")
-		if not parent or parent in seen:
-			return credited_to
-		if not frappe.db.get_value("Sales Person", parent, "is_group"):
-			return credited_to
-		seen.add(parent)
-		credited_to = parent
+	parent = frappe.db.get_value("Sales Person", sales_person, "parent_sales_person")
+	if parent and frappe.db.get_value("Sales Person", parent, "is_group"):
+		return parent
+	return sales_person
 
 
 def _calculate_commission(rule, item):
