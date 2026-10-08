@@ -242,7 +242,7 @@
  "index_web_pages_for_search": 0,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-10-08 00:00:00.000000",
+ "modified": "2026-10-08 09:00:00.000000",
  "modified_by": "Administrator",
  "module": "Blueline",
  "name": "Sales Commission Entry",
@@ -308,7 +308,8 @@
   {
    "permlevel": 3,
    "read": 1,
-   "role": "Financial Manager"
+   "role": "Financial Manager",
+   "write": 1
   },
   {
    "email": 1,
