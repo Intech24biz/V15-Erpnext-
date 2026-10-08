@@ -75,6 +75,7 @@ MANUAL_CUSTOMER_ALIASES = {
 	"Pyramid Lanka (Pvt) Limited": "PYRAMID LANKA PVT LTD",
 	"DHT Cement (Pvt) Ltd": "DHT Cement Pvt Ltd",
 	"Ceylon Tobacco Company PLC": "Ceylon Tobacco Company",
+	"Sunshine Consumer Lanka": "Sunshine Consumer Lanka Pvt Ltd",
 }
 
 RS_EACH = re.compile(r"^rs\.?\s*([\d,]+(?:\.\d+)?)\s*(?:each|per\s*unit)?$", re.I)
