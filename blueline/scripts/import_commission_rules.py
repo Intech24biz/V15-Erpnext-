@@ -16,6 +16,7 @@ resolved by name with case and whitespace ignored (trim, collapse spaces, casefo
 anything that fails to resolve — or resolves to more than one record — is reported, not
 created. Several people may share one customer+item (a sale can pay several payees).
 Service-based rows (not item sales) are held out entirely; they need their own design.
+Rows whose item is on HELD_ITEMS are never created, regardless of what exists on the site.
 """
 
 import re
@@ -51,6 +52,29 @@ SERVICE_ROWS = {"engineering commissioning", "visit and inspection", "repair ser
 # reference and the workbook's exact cell text match; the target must be an existing Item.
 MANUAL_ITEM_ALIASES = {
 	("Sales Person!24", "KCE-53-12PAT1-SV"): "Savema KCE-53-12PAT1-SV 53mm",
+}
+
+# Deliberately deferred pending client confirmation. Matched against the workbook's item text
+# (case/space-insensitive) BEFORE any item matching, so these rows are never created — even in
+# execute mode, and even when a same-named Item exists on the site.
+HELD_ITEMS = [
+	"170xi4 - 300 DPI",
+	"3811 DOD Water Based Black Ink",
+	'BL 080 1/2"',
+	"BL110",
+	"BLZLWRFIPC 33mmX450M BLK",
+	"GI WR3811BK - HP",
+	"GI WR3913 BK - HP",
+	"SAVEMA 53C Thermal Printer Head",
+]
+
+# Explicit, reviewed customer mappings — not fuzzy matching. Keyed by the workbook's exact
+# customer text; applied only when the target exists on this site (otherwise normal matching
+# runs and the alias is reported as not applied).
+MANUAL_CUSTOMER_ALIASES = {
+	"Pyramid Lanka (Pvt) Limited": "PYRAMID LANKA PVT LTD",
+	"DHT Cement (Pvt) Ltd": "DHT Cement Pvt Ltd",
+	"Ceylon Tobacco Company PLC": "Ceylon Tobacco Company",
 }
 
 RS_EACH = re.compile(r"^rs\.?\s*([\d,]+(?:\.\d+)?)\s*(?:each|per\s*unit)?$", re.I)
@@ -179,8 +203,13 @@ def run(path, execute=False, include_catch_all=False):
 	unmatched = {"Sales Person": defaultdict(list), "Customer": defaultdict(list), "Item": defaultdict(list), "Company": defaultdict(list)}
 	hints = {}
 	no_rate, unresolved, candidates, services, aliases_applied = [], [], [], [], []
+	held_items, customer_aliases_applied = [], []
+	held_norm = {_norm(i) for i in HELD_ITEMS}
 
 	for row in _read_rows(path):
+		if row["item"] and _norm(row["item"]) in held_norm:
+			held_items.append(row)
+			continue
 		if _norm(row["item"]) in SERVICE_ROWS:
 			services.append(row)
 			continue
@@ -201,7 +230,14 @@ def run(path, execute=False, include_catch_all=False):
 			row["notes"].append(f"sales person {note}")
 		customer = None
 		if row["customer"]:
-			customer, note = customers.resolve(row["customer"])
+			alias = MANUAL_CUSTOMER_ALIASES.get(row["customer"])
+			target = frappe.db.get_value("Customer", alias, "name") if alias else None
+			if alias and target == alias:
+				customer = target
+				note = f"MANUALLY ALIASED (explicit table, not a fuzzy match): {row['customer']!r} -> {target!r}"
+				customer_aliases_applied.append((row["ref"], row["customer"], target))
+			else:
+				customer, note = customers.resolve(row["customer"])
 			if not customer:
 				failed.append("Customer")
 				unmatched["Customer"][row["customer"]].append(row["ref"])
@@ -284,7 +320,8 @@ def run(path, execute=False, include_catch_all=False):
 			continue
 		create.append(c)
 
-	_report(path, execute, include_catch_all, create, already, blocked, held, services, aliases_applied, unresolved, no_rate, unmatched, hints)
+	_report(path, execute, include_catch_all, create, already, blocked, held, services, aliases_applied,
+	        held_items, customer_aliases_applied, unresolved, no_rate, unmatched, hints)
 
 	if not execute:
 		print("\nDRY RUN — nothing was written.")
@@ -317,17 +354,34 @@ def _line(c):
 	return f"  {c['row']['ref']:<26} {c['sales_person']} | {cust} | {item} | {c['company']} | {rate}{notes}"
 
 
-def _report(path, execute, include_catch_all, create, already, blocked, held, services, aliases_applied, unresolved, no_rate, unmatched, hints):
+def _report(path, execute, include_catch_all, create, already, blocked, held, services, aliases_applied,
+            held_items, customer_aliases_applied, unresolved, no_rate, unmatched, hints):
 	p = print
 	p(f"SALES COMMISSION RULE IMPORT — {'EXECUTE' if execute else 'DRY RUN'}")
 	p(f"File: {path}")
 	p(f"Totals: would create {len(create)} | already exist {len(already)} | blocked (same person, conflicting rates) {sum(len(g) for g, _ in blocked)} rows"
-	  f" | catch-all held {len(held)} | service-based held {len(services)} | unresolved {len(unresolved)} | no usable rate {len(no_rate)}")
+	  f" | held pending confirmation {len(held_items)} | catch-all held {len(held)} | service-based held {len(services)}"
+	  f" | unresolved {len(unresolved)} | no usable rate {len(no_rate)}")
 
 	p(f"\n=== MANUAL ITEM ALIASES ({len(MANUAL_ITEM_ALIASES)} defined, {len(aliases_applied)} applied) — explicit mappings, not fuzzy matches")
 	for (ref, text), target in MANUAL_ITEM_ALIASES.items():
 		applied = any(a[0] == ref and a[1] == text for a in aliases_applied)
 		p(f"  {ref:<26} {text!r} -> {target!r}  [{'APPLIED' if applied else 'NOT APPLIED (row/text not found or target missing)'}]")
+
+	p(f"\n=== MANUAL CUSTOMER ALIASES ({len(MANUAL_CUSTOMER_ALIASES)} defined, {len(customer_aliases_applied)} row(s) aliased) — explicit mappings, not fuzzy matches")
+	for text, target in MANUAL_CUSTOMER_ALIASES.items():
+		refs = [a[0] for a in customer_aliases_applied if a[1] == text]
+		if refs:
+			status = f"APPLIED to {', '.join(refs)}"
+		elif frappe.db.get_value("Customer", target, "name") != target:
+			status = "NOT APPLIED (target is not a Customer on this site; normal matching used)"
+		else:
+			status = "NOT APPLIED (no row with this exact customer text)"
+		p(f"  {text!r} -> {target!r}  [{status}]")
+
+	p(f"\n=== HELD — PENDING CONFIRMATION (explicit hold list) ({len(held_items)}) — NEVER created, even in execute mode")
+	for row in held_items:
+		p(f"  {row['ref']:<26} item={row['item']!r} | person={row['person']!r} | customer={row['customer']!r}")
 
 	p(f"\n=== WOULD CREATE ({len(create)}) — row | sales_person | customer | item_code | company | rate")
 	for c in create:
