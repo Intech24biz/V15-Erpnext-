@@ -47,6 +47,12 @@ COL_BANK_NAME = "bank account name"
 # GI technical-team 40% structure: service-based, not item sales. Held out of this import.
 SERVICE_ROWS = {"engineering commissioning", "visit and inspection", "repair service", "special approved sales commission"}
 
+# Explicit, reviewed item mappings — not fuzzy matching. Applies only when BOTH the row
+# reference and the workbook's exact cell text match; the target must be an existing Item.
+MANUAL_ITEM_ALIASES = {
+	("Sales Person!24", "KCE-53-12PAT1-SV"): "Savema KCE-53-12PAT1-SV 53mm",
+}
+
 RS_EACH = re.compile(r"^rs\.?\s*([\d,]+(?:\.\d+)?)\s*(?:each|per\s*unit)?$", re.I)
 PERCENT = re.compile(r"^([\d.]+)\s*%$")
 
@@ -172,7 +178,7 @@ def run(path, execute=False, include_catch_all=False):
 
 	unmatched = {"Sales Person": defaultdict(list), "Customer": defaultdict(list), "Item": defaultdict(list), "Company": defaultdict(list)}
 	hints = {}
-	no_rate, unresolved, candidates, services = [], [], [], []
+	no_rate, unresolved, candidates, services, aliases_applied = [], [], [], [], []
 
 	for row in _read_rows(path):
 		if _norm(row["item"]) in SERVICE_ROWS:
@@ -204,7 +210,16 @@ def run(path, execute=False, include_catch_all=False):
 				row["notes"].append(f"customer {note}")
 		item_code = None
 		if row["item"]:
-			item_code, note = items.resolve(row["item"])
+			alias = MANUAL_ITEM_ALIASES.get((row["ref"], row["item"]))
+			if alias:
+				item_code = frappe.db.get_value("Item", alias, "name")
+				if item_code == alias:
+					note = f"MANUALLY ALIASED (explicit table, not a fuzzy match): {row['item']!r} -> {item_code!r}"
+					aliases_applied.append((row['ref'], row['item'], item_code))
+				else:
+					item_code, note = None, f"manual alias target {alias!r} is not an existing Item"
+			else:
+				item_code, note = items.resolve(row["item"])
 			if not item_code:
 				failed.append("Item")
 				unmatched["Item"][row["item"]].append(row["ref"])
@@ -269,7 +284,7 @@ def run(path, execute=False, include_catch_all=False):
 			continue
 		create.append(c)
 
-	_report(path, execute, include_catch_all, create, already, blocked, held, services, unresolved, no_rate, unmatched, hints)
+	_report(path, execute, include_catch_all, create, already, blocked, held, services, aliases_applied, unresolved, no_rate, unmatched, hints)
 
 	if not execute:
 		print("\nDRY RUN — nothing was written.")
@@ -302,12 +317,17 @@ def _line(c):
 	return f"  {c['row']['ref']:<26} {c['sales_person']} | {cust} | {item} | {c['company']} | {rate}{notes}"
 
 
-def _report(path, execute, include_catch_all, create, already, blocked, held, services, unresolved, no_rate, unmatched, hints):
+def _report(path, execute, include_catch_all, create, already, blocked, held, services, aliases_applied, unresolved, no_rate, unmatched, hints):
 	p = print
 	p(f"SALES COMMISSION RULE IMPORT — {'EXECUTE' if execute else 'DRY RUN'}")
 	p(f"File: {path}")
 	p(f"Totals: would create {len(create)} | already exist {len(already)} | blocked (same person, conflicting rates) {sum(len(g) for g, _ in blocked)} rows"
 	  f" | catch-all held {len(held)} | service-based held {len(services)} | unresolved {len(unresolved)} | no usable rate {len(no_rate)}")
+
+	p(f"\n=== MANUAL ITEM ALIASES ({len(MANUAL_ITEM_ALIASES)} defined, {len(aliases_applied)} applied) — explicit mappings, not fuzzy matches")
+	for (ref, text), target in MANUAL_ITEM_ALIASES.items():
+		applied = any(a[0] == ref and a[1] == text for a in aliases_applied)
+		p(f"  {ref:<26} {text!r} -> {target!r}  [{'APPLIED' if applied else 'NOT APPLIED (row/text not found or target missing)'}]")
 
 	p(f"\n=== WOULD CREATE ({len(create)}) — row | sales_person | customer | item_code | company | rate")
 	for c in create:
