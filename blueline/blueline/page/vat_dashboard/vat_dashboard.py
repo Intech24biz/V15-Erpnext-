@@ -1,3 +1,5 @@
+import re
+
 import frappe
 from frappe import _
 from frappe.utils import flt, getdate
@@ -9,6 +11,10 @@ SVAT_ROOT_TYPE = "Income"
 # Terms that disqualify an account even though its name contains "VAT" —
 # these catch intercompany payables and non-VAT tax accounts that share the substring.
 VAT_NAME_EXCLUDE_TERMS = ("NBT", "INCOME", "DUE", "BLUELINE", "INNOVATION")
+
+# "VAT" (or GI's "SVAT") as a whole word, not a substring — otherwise e.g.
+# "Transport - private vehicle expenses" matches via "pri-VAT-e".
+VAT_WORD = re.compile(r"(?<![A-Z0-9])S?VAT(?![A-Z0-9])", re.IGNORECASE)
 
 
 def _check_permission():
@@ -25,7 +31,8 @@ def _get_vat_accounts(company):
 		conditions.append(f"upper(name) not like %({key})s")
 		params[key] = f"%{term}%"
 
-	return frappe.db.sql(
+	# The SQL LIKE is only a cheap pre-filter; VAT_WORD decides.
+	candidates = frappe.db.sql(
 		f"""
 		select name, root_type
 		from `tabAccount`
@@ -34,6 +41,7 @@ def _get_vat_accounts(company):
 		params,
 		as_dict=True,
 	)
+	return [row for row in candidates if VAT_WORD.search(row.name)]
 
 
 def _classify(root_type):
