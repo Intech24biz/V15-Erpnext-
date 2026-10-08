@@ -9,8 +9,11 @@ class SalesCommissionRule(Document):
 			self.check_duplicate()
 
 	def check_duplicate(self):
-		# Same sales_person + customer + item_code + company (blank customer/item_code
-		# included literally, since "" means "any" and is itself a specific combination).
+		# One enabled rule per sales_person + customer + item_code + company. Several
+		# sales persons may share a customer/item combination (a sale can pay several
+		# people), but one person can't have two rates for the same combination. Blank
+		# customer/item_code is included literally, since "" means "any" and is itself a
+		# specific combination.
 		filters = {
 			"sales_person": self.sales_person,
 			"customer": self.customer or "",

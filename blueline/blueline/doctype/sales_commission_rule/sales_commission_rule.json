@@ -3,7 +3,7 @@
  "allow_rename": 0,
  "autoname": "hash",
  "creation": "2026-09-23 00:00:00.000000",
- "description": "Defines a commission rate for a Sales Person, optionally narrowed to a specific Customer and/or Item. Row-level access is scoped per company through Frappe's native Company User Permissions on the company field.",
+ "description": "Defines a commission rate for the sale of an Item and/or to a Customer, attributed to a Sales Person. Rules are matched on Sales Invoice submit by item/customer alone (the invoice's Sales Team table is not used); commission is credited to the matched Sales Person's direct group parent, if any. Row-level access is scoped per company through Frappe's native Company User Permissions on the company field.",
  "doctype": "DocType",
  "document_type": "Setup",
  "engine": "InnoDB",
@@ -26,7 +26,7 @@
    "label": "Rule"
   },
   {
-   "description": "Who earns this commission.",
+   "description": "The rep who made sales matching this rule. Commission is credited to their direct parent if that parent is a group, otherwise to them.",
    "fieldname": "sales_person",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -101,7 +101,7 @@
  "index_web_pages_for_search": 0,
  "is_submittable": 0,
  "links": [],
- "modified": "2026-09-23 00:00:00.000000",
+ "modified": "2026-10-08 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Blueline",
  "name": "Sales Commission Rule",

@@ -2,3 +2,4 @@
 
 [post_model_sync]
 blueline.patches.replace_global_coa_mapping_settings
+blueline.patches.split_commission_entry_sales_person
