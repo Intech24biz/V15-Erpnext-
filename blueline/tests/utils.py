@@ -43,7 +43,7 @@ class BluelineTestCase(unittest.TestCase):
 
 	def assertRefused(self, fn, message):
 		"""fn must raise a Frappe error whose text contains `message`."""
-		with self.assertRaises(frappe.ValidationError) as ctx:
+		with self.assertRaises((frappe.ValidationError, frappe.PermissionError)) as ctx:
 			fn()
 		self.assertIn(message, str(ctx.exception))
 		frappe.clear_messages()
@@ -153,6 +153,56 @@ def make_petty_cash_voucher(user="Administrator"):
 		)
 		pcv.insert()
 		return pcv
+
+
+def approved_invoice(creator=GI_TECH, approver=GI_MANAGEMENT, lines=None):
+	"""Sales Invoice taken through Send for Approval -> Approve by two different users."""
+	si = make_sales_invoice(creator, lines)
+	workflow(si, "Send for Approval", creator)
+	workflow(si, "Approve", approver)
+	return reload(si)
+
+
+def approved_payment_for(invoice, creator=GI_TECH, approver=GI_MANAGEMENT):
+	"""Full-amount Payment Entry against `invoice`, approved through the workflow. Its
+	on_submit releases the invoice's commission entries to Pending Approval."""
+	from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
+
+	with as_user(creator):
+		pe = get_payment_entry("Sales Invoice", invoice.name, bank_account="Cash - BEPL")
+		pe.reference_no = pe.reference_no or "blueline-test"
+		pe.reference_date = pe.reference_date or nowdate()
+		pe.insert()
+	workflow(pe, "Send for Approval", creator)
+	workflow(pe, "Approve", approver)
+	return reload(pe)
+
+
+def commission_entries(invoice_name, **filters):
+	return frappe.get_all(
+		"Sales Commission Entry",
+		filters={"sales_invoice": invoice_name, **filters},
+		fields=["name", "matched_sales_person", "commission_credited_to", "commission_amount", "status", "docstatus"],
+		order_by="name",
+	)
+
+
+def pending_commission_entry():
+	"""One commission entry in "Payment Received - Pending Approval", reached the real way:
+	approved invoice, then an approved payment. Returns (entry name, invoice, payment)."""
+	invoice = approved_invoice()
+	payment = approved_payment_for(invoice)
+	entry = commission_entries(invoice.name)[0]
+	assert entry.status == "Payment Received - Pending Approval", entry
+	return entry.name, invoice, payment
+
+
+def update_entry(entry_name, user, **values):
+	with as_user(user):
+		entry = frappe.get_doc("Sales Commission Entry", entry_name)
+		entry.update(values)
+		entry.save()
+		return entry
 
 
 FACTORIES = {

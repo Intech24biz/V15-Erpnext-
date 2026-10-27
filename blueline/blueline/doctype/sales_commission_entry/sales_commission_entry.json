@@ -35,7 +35,9 @@
   "status",
   "column_break_appr1",
   "approved_by_management",
-  "approved_by_technical"
+  "management_approved_by",
+  "approved_by_technical",
+  "technical_approved_by"
  ],
  "fields": [
   {
@@ -230,11 +232,33 @@
   },
   {
    "allow_on_submit": 1,
-   "description": "Only the Technical Approver role can set this.",
+   "depends_on": "approved_by_management",
+   "description": "Set by the system to the user who ticked Approved by Management.",
+   "fieldname": "management_approved_by",
+   "fieldtype": "Link",
+   "label": "Management Approval By",
+   "no_copy": 1,
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "description": "Only the Technical Approver role can set this. Must be a different user from the one who gave the Management approval.",
    "fieldname": "approved_by_technical",
    "fieldtype": "Check",
    "label": "Approved by Technical",
    "permlevel": 2
+  },
+  {
+   "allow_on_submit": 1,
+   "depends_on": "approved_by_technical",
+   "description": "Set by the system to the user who ticked Approved by Technical.",
+   "fieldname": "technical_approved_by",
+   "fieldtype": "Link",
+   "label": "Technical Approval By",
+   "no_copy": 1,
+   "options": "User",
+   "read_only": 1
   }
  ],
  "icon": "fa fa-money",
@@ -242,7 +266,7 @@
  "index_web_pages_for_search": 0,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-10-08 09:00:00.000000",
+ "modified": "2026-10-27 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Blueline",
  "name": "Sales Commission Entry",

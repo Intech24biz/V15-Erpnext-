@@ -5,6 +5,16 @@ from frappe.utils import cint, cstr
 
 PENDING_APPROVAL_STATUS = "Payment Received - Pending Approval"
 APPROVED_STATUS = "Approved"
+PAID_STATUS = "Paid"
+
+# Once an entry reaches one of these, its approval ticks are history and can't change.
+LOCKED_STATUSES = (APPROVED_STATUS, PAID_STATUS)
+
+# approval checkbox -> field recording the user who ticked it (set server-side only)
+APPROVAL_TICKS = {
+	"approved_by_management": "management_approved_by",
+	"approved_by_technical": "technical_approved_by",
+}
 
 
 class SalesCommissionEntry(Document):
@@ -42,11 +52,69 @@ class SalesCommissionEntry(Document):
 				title=_("Not Permitted"),
 			)
 
+	def validate(self):
+		# Entries are normally created already submitted, but System Manager may still
+		# create one by hand; the same approval rules apply to a draft.
+		self.apply_approval_rules()
+
 	def before_update_after_submit(self):
 		# Ticking either approval checkbox re-saves an already-submitted entry, which
 		# takes this path (not validate()) — see sales_commission.py for why.
+		self.apply_approval_rules()
 		self.auto_promote_to_approved()
 		self.require_both_approvals()
+
+	def apply_approval_rules(self):
+		# These hold for every user and role (Administrator and System Manager included)
+		# and for system saves that set ignore_permissions.
+		self.lock_approvals_once_approved()
+		self.record_approvers()
+		self.refuse_same_approver()
+
+	def lock_approvals_once_approved(self):
+		before = self.get_doc_before_save()
+		if not before or before.status not in LOCKED_STATUSES:
+			return
+		for tick in APPROVAL_TICKS:
+			if cint(self.get(tick)) != cint(before.get(tick)):
+				frappe.throw(
+					_("{0} cannot be changed once the entry is {1}.").format(
+						frappe.bold(_(self.meta.get_label(tick))), _(before.status)
+					),
+					title=_("Approval Locked"),
+				)
+
+	def record_approvers(self):
+		# The "... Approval By" fields are read_only only in the UI, so whatever the client
+		# sent is discarded: a tick going 0 -> 1 records the session user, a cleared tick
+		# clears it, and an unchanged tick keeps the stored value.
+		before = self.get_doc_before_save()
+		for tick, approver_field in APPROVAL_TICKS.items():
+			ticked_before = cint(before.get(tick)) if before else 0
+			if not cint(self.get(tick)):
+				self.set(approver_field, None)
+			elif not ticked_before:
+				self.set(approver_field, frappe.session.user)
+			else:
+				self.set(approver_field, before.get(approver_field))
+
+	def refuse_same_approver(self):
+		before = self.get_doc_before_save()
+		if before and before.status in LOCKED_STATUSES:
+			return
+		if not (self.approved_by_management and self.approved_by_technical):
+			return
+		if self.management_approved_by and self.management_approved_by == self.technical_approved_by:
+			frappe.throw(
+				_(
+					"{0} and {1} must be given by two different users. {2} cannot give both approvals."
+				).format(
+					frappe.bold(_("Approved by Management")),
+					frappe.bold(_("Approved by Technical")),
+					frappe.bold(self.management_approved_by),
+				),
+				title=_("Same User Cannot Give Both Approvals"),
+			)
 
 	def auto_promote_to_approved(self):
 		# The matching Pending Approval -> Approved transitions in the workflow fixture
@@ -76,6 +144,16 @@ class SalesCommissionEntry(Document):
 				_("Both approvals are required before this entry can be Approved: tick {0} and {1}.").format(
 					frappe.bold(_("Approved by Management")), frappe.bold(_("Approved by Technical"))
 				),
+				title=_("Approval Incomplete"),
+			)
+		# Ticks given before approvers were recorded (and not recoverable from the version
+		# history) can't be proven to come from two people, so they don't count.
+		if not (self.management_approved_by and self.technical_approved_by):
+			frappe.throw(
+				_(
+					"This entry's approvals were given before the approving users were recorded. "
+					"Untick {0} and {1} and have two different users tick them again."
+				).format(frappe.bold(_("Approved by Management")), frappe.bold(_("Approved by Technical"))),
 				title=_("Approval Incomplete"),
 			)
 
