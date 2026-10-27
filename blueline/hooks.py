@@ -67,14 +67,23 @@ doc_events = {
         ],
     },
     "Sales Invoice": {
-        "validate": "blueline.server_scripts.self_approval.record_sender",
+        "before_insert": "blueline.server_scripts.tax_invoice_serial.set_credit_note_series",
+        "validate": [
+            "blueline.server_scripts.self_approval.record_sender",
+            "blueline.server_scripts.tax_invoice_serial.validate_serial_and_series",
+        ],
         "before_submit": [
             "blueline.server_scripts.self_approval.block_self_approval",
             "blueline.server_scripts.tax_invoice_serial.generate_serial_number",
             "blueline.server_scripts.approval_enforcement.enforce_approval",
         ],
         "on_submit": "blueline.server_scripts.sales_commission.create_commission_entries",
-        "before_cancel": "blueline.server_scripts.sales_commission.guard_commission_entries_on_cancel",
+        "before_cancel": [
+            # Approved tax invoices are reversed by Credit Note, never cancelled; the
+            # commission guard still covers invoices that never received a serial.
+            "blueline.server_scripts.tax_invoice_serial.block_cancel_of_tax_invoice",
+            "blueline.server_scripts.sales_commission.guard_commission_entries_on_cancel",
+        ],
     },
     "Petty Cash Voucher": {
         "validate": "blueline.server_scripts.self_approval.record_sender",
