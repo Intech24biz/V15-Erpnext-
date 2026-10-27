@@ -91,12 +91,35 @@ blueline.VatDashboard = class VatDashboard {
 				.vat-dashboard .vatd-charts,
 				.vat-dashboard .vatd-tables { margin-bottom: 25px; }
 				.vat-dashboard .vatd-totals-row { font-weight: 600; }
+				.vat-dashboard .vatd-toggle { margin-bottom: 10px; }
+				.vat-dashboard .vatd-toggle label {
+					display: inline-flex;
+					align-items: center;
+					gap: 6px;
+					margin: 0;
+					cursor: pointer;
+					color: var(--text-color);
+				}
+				.vat-dashboard .vatd-cards-note {
+					margin: -5px 0 20px;
+					font-size: 12px;
+					color: var(--text-muted);
+				}
 			</style>`).appendTo("head");
 		}
 
 		this.body = $(`
 			<div class="vat-dashboard">
+				<div class="vatd-toggle">
+					<label>
+						<input type="checkbox" class="vatd-raw-toggle">
+						${__("Show raw ledger totals")}
+					</label>
+				</div>
 				<div class="row vatd-cards"></div>
+				<div class="vatd-cards-note">
+					${__("Cards regroup wrong-direction balances; the monthly table shows raw figures.")}
+				</div>
 				<div class="row vatd-charts">
 					<div class="col-md-12">
 						<div class="vatd-chart-title">${__("Monthly Output vs Input vs Net VAT")}</div>
@@ -111,6 +134,20 @@ blueline.VatDashboard = class VatDashboard {
 				</div>
 			</div>
 		`).appendTo(this.page.body);
+
+		// Off by default (regrouped cards, as before). Switching only re-renders the cards
+		// from data already loaded; both summaries come back in the same response.
+		this.show_raw = false;
+		this.body.find(".vatd-raw-toggle").on("change", (e) => {
+			this.show_raw = e.target.checked;
+			if (this.data) {
+				this.render_cards(this.get_card_summary(this.data));
+			}
+		});
+	}
+
+	get_card_summary(data) {
+		return this.show_raw ? data.raw_summary : data.summary;
 	}
 
 	refresh() {
@@ -133,7 +170,7 @@ blueline.VatDashboard = class VatDashboard {
 	}
 
 	render(data) {
-		this.render_cards(data.summary);
+		this.render_cards(this.get_card_summary(data));
 		this.render_monthly_chart(data.monthly);
 		this.render_monthly_table(data.monthly);
 	}
@@ -146,9 +183,13 @@ blueline.VatDashboard = class VatDashboard {
 			? `(${format_currency(Math.abs(summary.net_vat), currency)})`
 			: format_currency(summary.net_vat, currency);
 
+		const raw_suffix = this.show_raw ? ` ${__("(raw ledger)")}` : "";
 		const cards = [
-			{ label: __("Total Output VAT"), value: format_currency(summary.total_output, currency) },
-			{ label: __("Total Input VAT (Recoverable)"), value: format_currency(summary.total_input, currency) },
+			{ label: __("Total Output VAT") + raw_suffix, value: format_currency(summary.total_output, currency) },
+			{
+				label: __("Total Input VAT (Recoverable)") + raw_suffix,
+				value: format_currency(summary.total_input, currency),
+			},
 			{ label: net_label, value: net_value, refund: net_is_refund },
 		];
 
