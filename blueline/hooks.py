@@ -53,21 +53,39 @@ fixtures = [
 
 doc_events = {
     "Quotation": {
-        "before_submit": "blueline.server_scripts.approval_enforcement.enforce_approval",
+        "validate": "blueline.server_scripts.self_approval.record_sender",
+        "before_submit": [
+            "blueline.server_scripts.self_approval.block_self_approval",
+            "blueline.server_scripts.approval_enforcement.enforce_approval",
+        ],
     },
     "Purchase Order": {
-        "before_submit": "blueline.server_scripts.approval_enforcement.enforce_approval",
+        "validate": "blueline.server_scripts.self_approval.record_sender",
+        "before_submit": [
+            "blueline.server_scripts.self_approval.block_self_approval",
+            "blueline.server_scripts.approval_enforcement.enforce_approval",
+        ],
     },
     "Sales Invoice": {
+        "validate": "blueline.server_scripts.self_approval.record_sender",
         "before_submit": [
+            "blueline.server_scripts.self_approval.block_self_approval",
             "blueline.server_scripts.tax_invoice_serial.generate_serial_number",
             "blueline.server_scripts.approval_enforcement.enforce_approval",
         ],
         "on_submit": "blueline.server_scripts.sales_commission.create_commission_entries",
         "before_cancel": "blueline.server_scripts.sales_commission.guard_commission_entries_on_cancel",
     },
+    "Petty Cash Voucher": {
+        "validate": "blueline.server_scripts.self_approval.record_sender",
+        "before_submit": "blueline.server_scripts.self_approval.block_self_approval",
+    },
     "Payment Entry": {
-        "before_submit": "blueline.server_scripts.approval_enforcement.enforce_approval",
+        "validate": "blueline.server_scripts.self_approval.record_sender",
+        "before_submit": [
+            "blueline.server_scripts.self_approval.block_self_approval",
+            "blueline.server_scripts.approval_enforcement.enforce_approval",
+        ],
         "on_submit": "blueline.server_scripts.sales_commission.release_commission_entries",
         # Payment Reconciliation can update an already-submitted Payment Entry's
         # references without re-firing on_submit; this catches that path too.
