@@ -9,7 +9,8 @@
 
 Added from branch `feature/credit-note-commission-approval-roles` (update the manual only once that branch is deployed too):
 
-4. a Credit Note adjusts the sales commission on the invoice automatically (new 3.2a).
+4. a Credit Note adjusts the sales commission on the invoice automatically (new 3.2a);
+5. a System Manager changes who can approve in the Workflow screen, and the change is kept (new 5.4).
 
 Each block below says exactly which part of the manual it replaces or adds to. Text in quotes is the **current** wording, for locating it. Everything under "New text" is ready to paste. Update the manual only once the branch is deployed to production.
 
@@ -125,6 +126,40 @@ Notes for the editor are marked **[Editor]** and are not part of the manual.
 > - goes through the same Send for Approval → Approve steps as an invoice, and the person who created or sent it can't approve it.
 >
 > Draft invoices and invoices still waiting for approval can be deleted as before, so mistakes caught before approval are still the simplest to fix.
+
+### 5d. Add a new section 5.4 after 5.3 (from branch `feature/credit-note-commission-approval-roles`)
+
+**New text:**
+
+> **5.4 Changing who can approve (System Manager only)**
+>
+> Who may approve each type of document is set in its *workflow*. Only a System Manager can change a workflow. Every change is recorded with who made it and when, and it stays in place when the system is updated.
+>
+> | Document | Workflow to open |
+> |---|---|
+> | Quotation | GI Quotation Approval |
+> | Purchase Order | GI Purchase Order Approval |
+> | Sales Invoice (and Credit Note) | GI Sales Invoice Approval |
+> | Payment Entry | GI Payment Entry Approval |
+> | Petty Cash Voucher | GI Petty Cash Approval |
+>
+> **To let another role approve:**
+>
+> 1. Log in as a System Manager.
+> 2. Type **Workflow List** in the search bar and open the workflow from the table above.
+> 3. Scroll down to the **Transitions** table. Each row where **State** is *Pending Approval* and **Action** is *Approve* gives one role the right to approve.
+> 4. Click **Add Row** and fill it in exactly like the other Approve rows: **State** *Pending Approval*, **Action** *Approve*, **Next State** *Approved*, **Allowed** the new role. Tick **Allow Self Approval**, as on the other rows. (This box doesn't let anyone approve their own document — the system always blocks that.)
+> 5. Click **Save**. The change works straight away; people may need to reload the page.
+> 6. So that the new role is also told when something is waiting, type **Notification List** in the search bar, open the matching notification (for example *GI Purchase Order Pending Approval*), add a row in **Recipients** with **Receiver By Role** set to the new role, and **Save**.
+> 7. Make sure the people who should approve actually have that role: open each person under **User**, tick the role under **Roles**, and **Save**.
+>
+> **To stop a role approving:** open the workflow, tick the role's *Approve* row in **Transitions**, click **Delete**, then **Save**. Remove the role from the notification's **Recipients** too.
+>
+> **To see who changed what:** open the workflow and scroll to the bottom. The activity list shows each change, who made it and when.
+>
+> Leave the *Send for Approval* rows alone unless you also want to change who can send documents for approval. Whatever the workflow says, nobody can approve a document they created or sent for approval.
+
+**[Editor]** On Petty Cash Vouchers today, *Approve* is given to GI Management and GI Tech Dept only — GI Sales Dept has the direct *Submit* shortcut but not *Approve*. If GI Sales Dept should approve vouchers too, a System Manager can add it with the steps above.
 
 ---
 

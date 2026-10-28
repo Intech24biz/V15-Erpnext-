@@ -10,6 +10,11 @@ app_version = app_version
 
 required_apps = ["erpnext"]
 
+# Workflows ("GI ...") and their pending-approval Notifications are deliberately NOT fixtures:
+# Frappe re-imports fixtures with force=True on every bench migrate, which put back the
+# shipped approver roles over any change a System Manager had made on site. They are
+# seeded from blueline/setup_data/ by setup.after_migrate, insert-only. To change them on
+# an existing site, use the Workflow / Notification screen (or a patch), not those files.
 fixtures = [
     {"doctype": "Custom Field", "filters": [["module", "=", "Blueline"]]},
     {
@@ -25,7 +30,6 @@ fixtures = [
             ]],
         ],
     },
-    {"doctype": "Workflow", "filters": [["name", "like", "GI %"]]},
     {
         "doctype": "Workflow State",
         "filters": [["name", "in", [
@@ -47,11 +51,14 @@ fixtures = [
             "Mark as Paid",
         ]]],
     },
-    {"doctype": "Notification", "filters": [["name", "like", "GI %"]]},
     {"doctype": "Workspace", "filters": [["name", "=", "Blueline Control Center"]]},
 ]
 
 doc_events = {
+    "Workflow": {
+        "validate": "blueline.server_scripts.workflow_guard.only_system_manager",
+        "on_trash": "blueline.server_scripts.workflow_guard.only_system_manager",
+    },
     "Quotation": {
         "validate": "blueline.server_scripts.self_approval.record_sender",
         "before_submit": [

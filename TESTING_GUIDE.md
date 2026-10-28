@@ -12,6 +12,7 @@
 >
 > **Updated 2026-10-29 (branch `feature/credit-note-commission-approval-roles`, not deployed):**
 > - **Credit Notes now adjust commission** (K11 resolved). Approving a Credit Note reduces the original invoice's unpaid commission entries in proportion to what was returned (a full return cancels them), and creates a negative **Deduction** entry for commission that was already paid. Cancelling the Credit Note undoes all of it. No ledger entries are involved. New section **2.9**; changed **2.8** step 5 and **3.7** step 12.
+> - **Approver roles are changed in the Workflow screen and stay changed.** Previously every update (bench migrate) silently put the shipped approver roles and notification recipients back. Workflows and pending-approval notifications are now only created if missing, never overwritten; only a System Manager can edit a workflow, and each change is recorded. New section **3.8**.
 
 ---
 
@@ -465,6 +466,26 @@ Use a **Purchase Order** (no ledger impact even if something goes wrong). Expect
 
 **Wrong results:** the Cancel in A goes through; the Credit Note gets a `BTAX-0000x` number or a Tax Invoice Serial; the original's number/serial changes; the creator can approve the Credit Note.
 
+### 3.8 Changing approver roles — [REVERSIBLE: make a change, check it, change it back]
+
+Use the **Purchase Order** workflow (no ledger impact). The steps a System Manager follows are in the user manual (new section 5.4).
+
+**A. Only a System Manager can change a workflow — [SAFE]**
+1. As **office@** (GI Management, not System Manager): open **/app/workflow/GI Purchase Order Approval**. **Expected:** read-only or "Not permitted"; no Save. **Wrong result:** office@ can save it.
+
+**B. Add an approver role**
+2. As **ceo@** (System Manager): open **/app/workflow/GI Purchase Order Approval** → **Transitions** table → **Add Row**: State `Pending Approval`, Action `Approve`, Next State `Approved`, Allowed `GI Sales Dept 2`, **Allow Self Approval** ticked (like the other Approve rows) → **Save**.
+3. As **tech@**: new Purchase Order (as in 3.2) → Save → Send for Approval.
+4. As **geninnov.tech2@gmail.com** (GI Sales Dept 2): open it. **Expected:** **Actions → Approve** is now offered. Don't approve (or, optional [PERMANENT]: approve, then cancel the PO).
+5. As **geninnov.tech2@**: create your own Purchase Order → Send for Approval → **Actions → Approve**. **Expected:** refused — *"You cannot approve a document you created or sent for approval."* The new role gets no exemption.
+6. On the workflow, scroll to the bottom (timeline / version history). **Expected:** an entry by ceo@ showing the added transition row.
+
+**C. The change survives an update**
+7. Ask whoever deploys to run the next update (`bench migrate`) — or skip on production and rely on the local test. Afterwards, reopen the workflow. **Expected:** the `GI Sales Dept 2` Approve row is still there. **Wrong result:** it disappeared (the old overwrite has come back).
+
+**D. Remove the role again (cleanup)**
+8. As ceo@: in the Transitions table tick the `GI Sales Dept 2` Approve row → **Delete** → **Save**. As geninnov.tech2@: open the pending PO from step 3. **Expected:** no Approve action. Delete both POs (⋯ → Delete).
+
 ---
 
 ## SECTION 4 — Petty Cash Voucher
@@ -609,6 +630,7 @@ Tick **P** (pass), **F** (fail), or **K** (known issue from 0.5).
 | 3.6 | **New:** creator (System Manager) and sender both refused on Approve; a third user is offered Approve | ☐ | ☐ | ☐ (K10) |
 | 3.7A | **New:** Cancel refused on an approved invoice, message points to Credit Note; drafts still deletable | ☐ | ☐ | |
 | 3.7B | **New:** Credit Note numbered `BTAX-RET-…`, no tax serial, goes through Send for Approval → Approve (creator refused), reverses the ledger; original keeps number/serial | ☐ | ☐ | ☐ (K3/K12) |
+| 3.8 | **New:** only System Manager can edit a workflow; an added approver role works, its holder still can't self-approve; change is in the version history and survives an update; removal takes effect | ☐ | ☐ | |
 | 4.1 | Petty Cash validation messages | ☐ | ☐ | |
 | 4.2 | Petty Cash → Pending Approval + notification; direct Submit refused on own voucher | ☐ | ☐ | ☐ (K5) |
 | 4.3 | Approve → Journal Entry auto-created, Dr expense / Cr cash | ☐ | ☐ | |
