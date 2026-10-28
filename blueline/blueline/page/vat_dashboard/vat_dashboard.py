@@ -84,8 +84,10 @@ def get_vat_data(company, from_date=None, to_date=None):
 		frappe.throw(_("Company is required"))
 
 	accounts = _get_vat_accounts(company)
+	empty_summary = {"total_output": 0.0, "total_input": 0.0, "total_svat": 0.0, "net_vat": 0.0}
 	empty_result = {
-		"summary": {"total_output": 0.0, "total_input": 0.0, "total_svat": 0.0, "net_vat": 0.0},
+		"summary": empty_summary,
+		"raw_summary": dict(empty_summary),
 		"monthly": [],
 		"account_detail": [],
 	}
@@ -178,8 +180,21 @@ def get_vat_data(company, from_date=None, to_date=None):
 		"net_vat": flt(total_output - total_input, 2),
 	}
 
+	# "Show raw ledger totals" on the page: the same accounts summed exactly as posted, with
+	# no regrouping of wrong-direction balances (so total_output can be negative). The net
+	# is identical to the regrouped summary — only the split between the cards differs.
+	raw_output = sum(row["amount"] for row in account_detail if row["classification"] == "output")
+	raw_input = sum(row["amount"] for row in account_detail if row["classification"] == "input")
+	raw_summary = {
+		"total_output": flt(raw_output, 2),
+		"total_input": flt(raw_input, 2),
+		"total_svat": total_svat,
+		"net_vat": flt(raw_output - raw_input, 2),
+	}
+
 	return {
 		"summary": summary,
+		"raw_summary": raw_summary,
 		"monthly": monthly,
 		"account_detail": account_detail,
 	}
