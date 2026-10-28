@@ -38,6 +38,11 @@ MARK_PAID_ROLES = {"System Manager", "Financial Manager"}
 # separate negative Deduction entry instead, since what was paid can't be un-paid.
 UNPAID_STATUSES = {ACCRUED_STATUS, PENDING_APPROVAL_STATUS, APPROVED_STATUS}
 
+CREDIT_NOTE_SUBMIT_SAVEPOINT = "blueline_credit_note_submit"
+COMMISSION_ADJUSTMENT_FAILED = (
+	"Commission could not be adjusted for this Credit Note; nothing was changed. Contact the administrator."
+)
+
 
 def create_commission_entries(doc, method=None):
 	"""Sales Invoice `on_submit`: accrue commission for every item row that matches an
@@ -286,6 +291,16 @@ def guard_commission_entries_on_cancel(doc, method=None):
 			)
 
 
+def mark_credit_note_savepoint(doc, method=None):
+	"""Sales Invoice `before_submit` (last in the list): on a Credit Note, remember the point
+	before its submission writes anything, so a failed commission adjustment can undo the
+	whole approval — the Credit Note's own postings included — not just the commission."""
+	if not doc.get("is_return"):
+		return
+	frappe.db.savepoint(CREDIT_NOTE_SUBMIT_SAVEPOINT)
+	doc.flags.commission_savepoint = CREDIT_NOTE_SUBMIT_SAVEPOINT
+
+
 def apply_credit_note(credit_note):
 	"""Credit Note `on_submit` (reached through create_commission_entries): adjust the
 	commission accrued on the original invoice in proportion to the line amount returned.
@@ -294,44 +309,51 @@ def apply_credit_note(credit_note):
 	  in place. A full return cancels the entry (status Cancelled; it stays submitted so a
 	  cancelled Credit Note can restore it). Approval ticks are never touched.
 	- Paid: a separate negative Deduction entry is created for the same person, flagged
-	  Deduct from Next Payout and linked to the Credit Note and to the paid entry.
+	  Deduct from Next Payout and linked to the Credit Note and to the paid entry. It starts
+	  in Payment Received - Pending Approval and needs the usual two-person sign-off.
 
 	Every change is written to the entry's Adjustments table and its Version history, with
-	the approving user. Nothing here reads or writes any accounting record. Like accrual,
-	a failure is logged and never blocks the Credit Note itself; it is all-or-nothing, so
-	no entry is left half-adjusted.
+	the approving user. Nothing here reads or writes any accounting record.
+
+	All or nothing: if any part fails, everything since the Credit Note's submission began
+	is rolled back (no entry partly adjusted, the Credit Note not approved), the error is
+	logged, and the approval is refused.
 	"""
 	if not credit_note.return_against:
 		return
-	returned = _returned_amount_by_line(credit_note)
-	if not returned:
-		return
 
-	# get_all, matching _release_entries_for_invoice: the system's own records for this
-	# specific invoice, which must be adjusted whoever approved the Credit Note.
-	entry_names = frappe.get_all(
-		ENTRY_DOCTYPE,
-		filters={
-			"sales_invoice": credit_note.return_against,
-			"sales_invoice_item": ["in", list(returned)],
-			"entry_type": COMMISSION_TYPE,
-			"docstatus": 1,
-		},
-		pluck="name",
-		order_by="name asc",
-	)
-	savepoint = "blueline_credit_note_commission"
-	frappe.db.savepoint(savepoint)
+	own_savepoint = "blueline_credit_note_commission"
+	frappe.db.savepoint(own_savepoint)
 	try:
+		returned = _returned_amount_by_line(credit_note)
+		# get_all, matching _release_entries_for_invoice: the system's own records for this
+		# specific invoice, which must be adjusted whoever approved the Credit Note.
+		entry_names = frappe.get_all(
+			ENTRY_DOCTYPE,
+			filters={
+				"sales_invoice": credit_note.return_against,
+				"sales_invoice_item": ["in", list(returned) or [""]],
+				"entry_type": COMMISSION_TYPE,
+				"docstatus": 1,
+			},
+			pluck="name",
+			order_by="name asc",
+		)
 		for entry_name in entry_names:
 			entry = frappe.get_doc(ENTRY_DOCTYPE, entry_name)
 			_adjust_entry(entry, credit_note, returned[entry.sales_invoice_item])
 	except Exception:
-		frappe.db.rollback(save_point=savepoint)
+		traceback = frappe.get_traceback()
+		frappe.db.rollback(save_point=credit_note.flags.get("commission_savepoint") or own_savepoint)
+		# Deferred: an Error Log inserted now would be rolled back with the refused request.
 		frappe.log_error(
 			title=f"Sales Commission credit note adjustment failed: {credit_note.name}",
-			message=frappe.get_traceback(),
+			message=traceback,
+			reference_doctype="Sales Invoice",
+			reference_name=credit_note.name,
+			defer_insert=True,
 		)
+		frappe.throw(_(COMMISSION_ADJUSTMENT_FAILED), title=_("Credit Note Not Approved"))
 
 
 def _returned_amount_by_line(credit_note):
@@ -453,6 +475,11 @@ def _create_deduction(entry, credit_note, returned_amount, amount):
 	)
 	deduction.insert(ignore_permissions=True)
 	deduction.submit()
+	# Straight on to Pending Approval, by the same workflow transition a fully paid invoice's
+	# entries take, so the existing pending-approval notification and the two-person
+	# sign-off (two different users, locked once Approved) apply to it unchanged.
+	deduction.status = PENDING_APPROVAL_STATUS
+	deduction.save()
 	return deduction
 
 

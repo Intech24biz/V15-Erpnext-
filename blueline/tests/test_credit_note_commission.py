@@ -32,6 +32,10 @@ SCE = "Sales Commission Entry"
 CN_ONLY = "can only be set to or from"
 NOT_ALLOWED_AFTER_SUBMIT = "Not allowed to change"
 LOCKED = "cannot be changed once the entry is"
+SAME_USER = "must be given by two different users"
+ADJUSTMENT_FAILED = (
+	"Commission could not be adjusted for this Credit Note; nothing was changed. Contact the administrator."
+)
 TECHNICAL_APPROVER = GI_MANAGEMENT
 
 # approved_invoice() sells 2 x COMMISSION_ITEM at 1000: three payees on one line.
@@ -203,7 +207,8 @@ class TestPaidCommission(BluelineTestCase):
 			(deduction.matched_sales_person, deduction.commission_credited_to),
 			(paid.matched_sales_person, paid.commission_credited_to),
 		)
-		self.assertEqual((deduction.docstatus, deduction.status), (1, "Accrued"))
+		self.assertEqual((deduction.docstatus, deduction.status), (1, "Payment Received - Pending Approval"))
+		self.assertEqual((deduction.approved_by_management, deduction.approved_by_technical), (0, 0))
 
 	def test_deduction_shows_on_the_register_as_outstanding(self):
 		invoice = paid_invoice_with_mixed_statuses()
@@ -225,16 +230,159 @@ class TestPaidCommission(BluelineTestCase):
 		invoice = paid_invoice_with_mixed_statuses()
 		credit_note(invoice, qty=1)
 		[deduction] = entries_by_person(invoice, "Deduction").values()
-		frappe.db.set_value(SCE, deduction.name, "status", "Approved")
+		approve(deduction.name)
+		self.assertEqual(reload(deduction).status, "Approved")
 		payment = frappe.get_value("Sales Commission Entry", entries_by_person(invoice)["W.B.Prasanna"].name, "payment_entry")
 		self.assertRefused(lambda: act(FINANCIAL_MANAGER, mark_commission_entry_paid, deduction.name, payment), "is a deduction")
 
 	def test_deduction_is_not_released_by_a_payment(self):
 		invoice = paid_invoice_with_mixed_statuses()
 		credit_note(invoice, qty=1)
-		sales_commission._release_entries_for_invoice(invoice.name)
 		[deduction] = entries_by_person(invoice, "Deduction").values()
-		self.assertEqual(deduction.status, "Accrued")
+		# Deductions start Pending Approval now; an Accrued one (e.g. made by hand) must
+		# still never be released by a payment on the invoice.
+		frappe.db.set_value(SCE, deduction.name, "status", "Accrued")
+		sales_commission._release_entries_for_invoice(invoice.name)
+		self.assertEqual(reload(deduction).status, "Accrued")
+
+
+class TestDeductionApproval(BluelineTestCase):
+	"""A deduction gets the same two-person sign-off as commission."""
+
+	def deduction(self):
+		invoice = paid_invoice_with_mixed_statuses()
+		credit_note(invoice, qty=1)
+		[deduction] = entries_by_person(invoice, "Deduction").values()
+		return invoice, deduction
+
+	def test_one_person_cannot_approve_a_deduction(self):
+		_, deduction = self.deduction()
+		self.assertRefused(
+			lambda: update_entry(deduction.name, SYSTEM_MANAGER, approved_by_management=1, approved_by_technical=1),
+			SAME_USER,
+		)
+		update_entry(deduction.name, SYSTEM_MANAGER, approved_by_technical=1)
+		self.assertRefused(lambda: update_entry(deduction.name, SYSTEM_MANAGER, approved_by_management=1), SAME_USER)
+		self.assertRefused(lambda: workflow(reload(deduction), "Approve", SYSTEM_MANAGER), "Both approvals are required")
+		self.assertEqual(reload(deduction).status, "Payment Received - Pending Approval")
+
+	def test_wrong_role_ticks_are_refused_on_a_deduction(self):
+		_, deduction = self.deduction()
+		self.assertRefused(
+			lambda: update_entry(deduction.name, TECHNICAL_APPROVER, approved_by_management=1),
+			"You don't have permission to change",
+		)
+
+	def test_two_different_people_approve_it_and_it_is_then_locked(self):
+		_, deduction = self.deduction()
+		update_entry(deduction.name, FINANCIAL_MANAGER, approved_by_management=1)
+		self.assertEqual(reload(deduction).status, "Payment Received - Pending Approval")
+		update_entry(deduction.name, TECHNICAL_APPROVER, approved_by_technical=1)
+		deduction = reload(deduction)
+		self.assertEqual(deduction.status, "Approved")
+		self.assertEqual(
+			(deduction.management_approved_by, deduction.technical_approved_by), (FINANCIAL_MANAGER, TECHNICAL_APPROVER)
+		)
+		self.assertEqual(flt(deduction.commission_amount), -65)
+		self.assertRefused(lambda: update_entry(deduction.name, FINANCIAL_MANAGER, approved_by_management=0), LOCKED)
+		self.assertRefused(lambda: update_entry(deduction.name, SYSTEM_MANAGER, approved_by_technical=0), LOCKED)
+
+	def test_approved_unsettled_deduction_stays_outstanding_on_the_register(self):
+		invoice, deduction = self.deduction()
+		approve(deduction.name)
+		data = act(FINANCIAL_MANAGER, get_entries, company=invoice.company)
+		[row] = [d for d in data["deductions"] if d["commission_credited_to"] == "W Chaminda Priyalal"]
+		self.assertEqual(flt(row["amount"]), -65)
+		self.assertEqual([(e["name"], e["status"]) for e in row["entries"]], [(deduction.name, "Approved")])
+		# The Approved status total is commission only; the approved deduction isn't netted into it.
+		approved = [e for e in data["entries"] if e.status == "Approved" and e.entry_type == "Commission"]
+		self.assertAlmostEqual(
+			flt(data["summary"]["Approved"]["commission_amount"]), sum(flt(e.commission_amount) for e in approved)
+		)
+
+	def test_cancelling_the_credit_note_cancels_an_approved_deduction(self):
+		invoice, deduction = self.deduction()
+		approve(deduction.name)
+		cancel(frappe.get_doc("Sales Invoice", deduction.credit_note))
+		deduction = reload(deduction)
+		self.assertEqual((deduction.docstatus, deduction.status), (2, "Cancelled"))
+		data = act(FINANCIAL_MANAGER, get_entries, company=invoice.company)
+		self.assertNotIn(deduction.name, [e["name"] for d in data["deductions"] for e in d["entries"]])
+
+
+class TestAdjustmentFailure(BluelineTestCase):
+	"""A failed adjustment refuses the Credit Note approval and leaves nothing half-done."""
+
+	def entry_state(self, invoice):
+		rows = frappe.db.sql(
+			"""select name, docstatus, status, commission_amount, original_commission_amount, modified
+			from `tabSales Commission Entry` where sales_invoice = %s order by name""",
+			invoice.name,
+		)
+		names = [r[0] for r in rows] or [""]
+		return (
+			rows,
+			frappe.db.count("Sales Commission Adjustment", {"parent": ["in", names]}),
+			frappe.db.count("Version", {"ref_doctype": SCE, "docname": ["in", names]}),
+			frappe.db.count("Comment", {"reference_doctype": SCE, "reference_name": ["in", names]}),
+		)
+
+	def queued_error_logs(self, credit_note_name):
+		"""Error Log records deferred to Redis (written by the scheduler after the request);
+		removed again so the test leaves nothing behind."""
+		key = "insert_queue_for_Error Log"  # frappe.deferred_insert's queue; the wrapper adds the site prefix
+		mine = [
+			r
+			for r in frappe.cache.lrange(key, 0, -1)
+			if credit_note_name.encode() in r and b"forced commission adjustment failure" in r
+		]
+		for r in mine:
+			frappe.cache.lrem(frappe.cache.make_key(key), 0, r)  # raw redis method: no prefixing
+		return mine
+
+	def test_forced_failure_leaves_entries_and_credit_note_unchanged(self):
+		invoice = paid_invoice_with_mixed_statuses()
+		with as_user(GI_SALES):
+			cn = make_sales_return(invoice.name)
+			cn.insert()
+		workflow(cn, "Send for Approval", GI_SALES)
+		before_entries = self.entry_state(invoice)
+		before_cn = frappe.db.get_value("Sales Invoice", cn.name, ["docstatus", "workflow_state", "status"])
+		before_ledger = ledger_snapshot()
+
+		# The first entry (Paid: a deduction is created) is adjusted and saved normally,
+		# then the second one fails.
+		real = sales_commission._adjust_entry
+		calls = []
+
+		def adjust(entry, credit_note, returned):
+			calls.append(entry.name)
+			if len(calls) == 2:
+				raise RuntimeError("forced commission adjustment failure")
+			return real(entry, credit_note, returned)
+
+		sales_commission._adjust_entry = adjust
+		try:
+			self.assertRefused(lambda: workflow(cn, "Approve", SYSTEM_MANAGER), ADJUSTMENT_FAILED)
+		finally:
+			sales_commission._adjust_entry = real
+		self.assertEqual(len(calls), 2)
+
+		# Checked straight away, without the extra rollback a web request would add.
+		self.assertEqual(self.entry_state(invoice), before_entries)
+		self.assertEqual(commission_entries(invoice.name, entry_type="Deduction"), [])
+		self.assertEqual(
+			frappe.db.get_value("Sales Invoice", cn.name, ["docstatus", "workflow_state", "status"]), before_cn
+		)
+		self.assertEqual(before_cn[:2], (0, "Pending Approval"))
+		self.assertEqual(ledger_snapshot(), before_ledger, "the Credit Note's own postings are undone too")
+		self.assertEqual(len(self.queued_error_logs(cn.name)), 1, "the Error Log must survive the rollback")
+
+		# Once the cause is gone, the same Credit Note approves and adjusts normally.
+		workflow(cn, "Approve", SYSTEM_MANAGER)
+		self.assertEqual(reload(cn).docstatus, 1)
+		self.assertEqual(entries_by_person(invoice)["M M M M PARIS"].status, "Cancelled")
+		self.assertEqual(len(commission_entries(invoice.name, entry_type="Deduction")), 1)
 
 
 class TestSeveralPayees(BluelineTestCase):

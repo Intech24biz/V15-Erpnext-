@@ -12,6 +12,7 @@
 >
 > **Updated 2026-10-29 (branch `feature/credit-note-commission-approval-roles`, not deployed):**
 > - **Credit Notes now adjust commission** (K11 resolved). Approving a Credit Note reduces the original invoice's unpaid commission entries in proportion to what was returned (a full return cancels them), and creates a negative **Deduction** entry for commission that was already paid. Cancelling the Credit Note undoes all of it. No ledger entries are involved. New section **2.9**; changed **2.8** step 5 and **3.7** step 12.
+> - **Deduction entries need the two-person approval** (start in *Payment Received - Pending Approval*), and **a Credit Note whose commission can't be adjusted is refused** with *"Commission could not be adjusted for this Credit Note; nothing was changed. Contact the administrator."* — nothing is half-done. See 2.9 C and H.
 > - **Approver roles are changed in the Workflow screen and stay changed.** Previously every update (bench migrate) silently put the shipped approver roles and notification recipients back. Workflows and pending-approval notifications are now only created if missing, never overwritten; only a System Manager can edit a workflow, and each change is recorded. New section **3.8**.
 
 ---
@@ -67,7 +68,7 @@ _K1 (Financial Manager's "Mark as Paid" silently failing) and K2 (wrong-role app
 | K10 | **"Approve" is still shown** in the Actions menu to the creator / sender of a document. Clicking it is refused with *"You cannot approve a document you created or sent for approval."* — the block is enforced on the server, the button is not hidden. | Sections 3.6, 3.7 |
 | ~~K11~~ | **Resolved (2026-10-29 branch).** A Credit Note now adjusts the original invoice's commission entries instead of creating negative Accrued entries — see 2.9. | Sections 2.8, 2.9, 3.7 |
 | K12 | **An approved Credit Note can still be cancelled** (it has no Tax Invoice Serial, so the cancel block doesn't apply to it). Pending client confirmation. Cancelling it now also restores the commission it adjusted (2.9 E). | Sections 2.9, 3.7 |
-| K13 | **Deduction entries have no approval or payout step yet.** A Deduction is created in status **Accrued** and stays there; nothing moves it on, and **Mark as Paid** refuses it. It shows as outstanding on the Sales Commission Register until netting against a payout is built. | Section 2.9 |
+| K13 | **Deduction entries have no payout step yet.** A Deduction is created in **Payment Received - Pending Approval** and is approved like any commission entry (two different people). After that it stays **Approved**: **Mark as Paid** refuses it, and it shows as outstanding on the Sales Commission Register until netting against a payout is built. | Section 2.9 |
 | K7 | **The VAT Dashboard page does not show the list of VAT accounts** — only totals, a chart and a monthly table. To see which accounts it uses, use the read-only URL in Section 5.4. | Section 5 |
 | K8 | **"Earliest Allowed Posting Date" on the COA configuration is not enforced yet** (that guard is not deployed). You can fill it in, but nothing will block back-dated postings. Don't test enforcement. | Section 1 |
 | K9 | **Blueline Enterprises has no default cash/bank account set**, so on Payment Entries you must pick "Account Paid To" by hand. (Filling "Default Cash Account" in the COA console is part of the long-term fix.) | Sections 2, 3 |
@@ -336,11 +337,12 @@ Use the multi-payee invoice from 2.7 (three entries: 6.00, 130.00, 130.00) and t
 
 **C. Paid commission → Deduction entry**
 6. Use the 2.2 invoice whose entry is **Paid** (from 2.6). Issue and approve a full Credit Note.
-7. **Expected:** the Paid entry is **unchanged** (still Paid, 3.00), with an Adjustments row *Deduction Created* linking a new entry. That new entry: **Entry Type = Deduction**, **Commission Amount −3.00**, **Deduct from Next Payout** ticked, **Credit Note** = your `BTAX-RET-…`, **Against Commission Entry** = the paid entry, same Matched Sales Person and Credited To, Status **Accrued** (K13).
-8. As the accountant: open the deduction. **Expected:** no **Approve** or **Mark as Paid** action is offered (it stays Accrued — K13). If anyone reaches Mark as Paid on a deduction another way, the server refuses: *"… is a deduction. Deductions are taken off a payout, not marked as Paid."*
+7. **Expected:** the Paid entry is **unchanged** (still Paid, 3.00), with an Adjustments row *Deduction Created* linking a new entry. That new entry: **Entry Type = Deduction**, **Commission Amount −3.00**, **Deduct from Next Payout** ticked, **Credit Note** = your `BTAX-RET-…`, **Against Commission Entry** = the paid entry, same Matched Sales Person and Credited To, Status **Payment Received - Pending Approval**. The accountant and office@ get the usual "pending your approval" bell notification.
+8. **Approve the deduction like any commission entry (2.4):** as ceo@, try ticking both boxes → refused (*"… must be given by two different users …"*). Then the accountant ticks **Approved by Management**, office@ ticks **Approved by Technical** → **Expected:** Status **Approved**, both "… Approval By" names filled in, ticks locked.
+8a. As the accountant: **Actions → Mark as Paid** on the approved deduction → **Expected:** refused — *"… is a deduction. Deductions are taken off a payout, not marked as Paid."* (K13). It stays Approved.
 
 **D. Register**
-9. Open **/app/sales-commission-register** (company Blueline). **Expected:** a table **Outstanding Deductions (deduct from next payout)** listing `Sales Team  LDA Perera` with **Amount to Deduct 3.00** and the deduction entry. The status cards do **not** include the deduction. In the main table, the deduction row shows Type **Deduction**, and reduced entries show *"was …"* under the amount.
+9. Open **/app/sales-commission-register** (company Blueline). **Expected:** a table **Outstanding Deductions (deduct from next payout)** listing `Sales Team  LDA Perera` with **Amount to Deduct 3.00** and the deduction entry, shown with its **Approved** badge (approved but not yet taken off a payout still counts as outstanding). The status cards do **not** include the deduction. In the main table, the deduction row shows Type **Deduction**, and reduced entries show *"was …"* under the amount.
 
 **E. Cancel a Credit Note → everything restored (K12)**
 10. As ceo@: open the Credit Note from step 1 → **Cancel**. **Expected:** the three entries go back to their amounts before that Credit Note; any that it cancelled return to their previous status. Its Adjustments rows stay, ticked **Reversed**, with **Reversed By**. Cancelling the Credit Note from step 6 cancels its Deduction entry (status Cancelled) and the deduction disappears from the register.
@@ -349,6 +351,9 @@ Use the multi-payee invoice from 2.7 (three entries: 6.00, 130.00, 130.00) and t
 11. As ceo@ (System Manager) or the accountant: on an adjusted entry, try to change **Status** to/from Cancelled → **Expected:** *"Status can only be set to or from Cancelled by approving or cancelling a Credit Note."* Commission Amount, Original Commission Amount and the Adjustments table can't be edited by anyone (read-only; the API refuses "Not allowed to change … after submission").
 
 **G. Ledger** — open each Credit Note → **View → Accounting Ledger**: only the Credit Note's own sales/receivable reversal; nothing for commission (commission entries never post to the ledger).
+
+**H. A failed commission adjustment blocks the Credit Note — [not testable in the browser]**
+A failure can't be forced from the screen; it is covered by the automated test (a failure is injected halfway through the adjustment). What a user would see: **Approve** on the Credit Note is refused with *"Commission could not be adjusted for this Credit Note; nothing was changed. Contact the administrator."* The Credit Note stays **Pending Approval** with no ledger entries, no commission entry changes, and an entry appears in **/app/error-log** titled *"Sales Commission credit note adjustment failed: BTAX-RET-…"* (written within about a minute, by the scheduler). If you ever see this message, report it with the Error Log entry.
 
 ---
 
@@ -621,7 +626,7 @@ Tick **P** (pass), **F** (fail), or **K** (known issue from 0.5).
 | 2.6 | Mark as Paid by the accountant → Paid (first production confirmation); ticks still locked | ☐ | ☐ | |
 | 2.7 | Multi-payee invoice → 3 entries with correct credited-to and amounts | ☐ | ☐ | |
 | 2.8 | Cleanup: invoice Cancel refused; reversed by Credit Note; unpaid commission Cancelled, none under the Credit Note | ☐ | ☐ | |
-| 2.9 | **New:** Credit Note reduces unpaid commission in proportion / cancels on full return; paid → Deduction entry (Accrued, can't be marked Paid); register shows outstanding deductions; cancelling the Credit Note restores all; status lock holds; no ledger posting | ☐ | ☐ | ☐ (K12/K13) |
+| 2.9 | **New:** Credit Note reduces unpaid commission in proportion / cancels on full return; paid → Deduction entry (Pending Approval, two different approvers, can't be marked Paid); register shows outstanding deductions, approved ones included; cancelling the Credit Note restores all; status lock holds; no ledger posting | ☐ | ☐ | ☐ (K12/K13) |
 | 3.1 | Quotation: no Submit; Send for Approval → Approve submits; SD2 unchanged; office@ refused approving own quotation | ☐ | ☐ | ☐ (K3/K10) |
 | 3.2 | Purchase Order: no Submit; Send for Approval; Approve offered | ☐ | ☐ | |
 | 3.3 | Sales Invoice: no Submit; Send for Approval; Approve offered | ☐ | ☐ | |

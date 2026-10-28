@@ -59,7 +59,7 @@ Notes for the editor are marked **[Editor]** and are not part of the manual.
 > When a Credit Note is approved against an invoice, the system adjusts the commission on that invoice by itself. Nobody needs to do anything.
 >
 > - **Commission not yet paid out** (Accrued, Payment Received – Pending Approval, or Approved): the amount goes down in proportion to what was returned. If half the line comes back, the commission halves. If the whole line comes back, the entry is **Cancelled** and its amount becomes zero.
-> - **Commission already paid**: the paid entry stays exactly as it was. The system creates a separate **Deduction** entry for the same person with a negative amount — the share of the commission for the goods that came back. It is marked **Deduct from Next Payout**.
+> - **Commission already paid**: the paid entry stays exactly as it was. The system creates a separate **Deduction** entry for the same person with a negative amount — the share of the commission for the goods that came back. It is marked **Deduct from Next Payout**. A deduction is signed off exactly like a commission entry: it starts at *Payment Received – Pending Approval*, and two different people tick **Approved by Management** and **Approved by Technical** (section 3.3).
 >
 > Each entry keeps its **Original Commission Amount**, and its **Adjustments** table lists every Credit Note that changed it: the amount before and after, and who approved the Credit Note. Nobody can edit these by hand, and approval ticks are never changed.
 >
@@ -67,9 +67,11 @@ Notes for the editor are marked **[Editor]** and are not part of the manual.
 >
 > Commission entries never post anything to the accounts. Only the Credit Note itself changes the ledger.
 >
-> **Outstanding deductions** are listed per person at the top of the **Sales Commission Register**. Take them off that person's next commission payout. Deductions are not included in the status totals.
+> **Outstanding deductions** are listed per person at the top of the **Sales Commission Register** — whether still waiting for approval or already approved. Take them off that person's next commission payout. Deductions are not included in the status totals, and a deduction can't be marked as Paid.
+>
+> If the commission can't be adjusted for some reason, the Credit Note is **not approved**. The approver sees *"Commission could not be adjusted for this Credit Note; nothing was changed. Contact the administrator."* Nothing has changed — not the Credit Note, not the accounts, not the commission — so the administrator can fix the cause and the Credit Note can then be approved as normal.
 
-**[Editor]** Deductions don't yet have their own approval or payout step; they are listed on the register until they are taken off a payout. Update this paragraph once the payout netting is built.
+**[Editor]** Deductions don't yet have a payout step; an approved deduction stays listed on the register until it is taken off a payout. Update this paragraph once the payout netting is built.
 
 ---
 

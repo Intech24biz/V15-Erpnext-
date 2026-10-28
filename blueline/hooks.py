@@ -83,6 +83,8 @@ doc_events = {
             "blueline.server_scripts.self_approval.block_self_approval",
             "blueline.server_scripts.tax_invoice_serial.generate_serial_number",
             "blueline.server_scripts.approval_enforcement.enforce_approval",
+            # Last: nothing the Credit Note's submission writes may come before it.
+            "blueline.server_scripts.sales_commission.mark_credit_note_savepoint",
         ],
         # On a Credit Note this adjusts the original invoice's commission instead of accruing.
         "on_submit": "blueline.server_scripts.sales_commission.create_commission_entries",
