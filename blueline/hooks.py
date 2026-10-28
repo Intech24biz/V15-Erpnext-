@@ -77,7 +77,9 @@ doc_events = {
             "blueline.server_scripts.tax_invoice_serial.generate_serial_number",
             "blueline.server_scripts.approval_enforcement.enforce_approval",
         ],
+        # On a Credit Note this adjusts the original invoice's commission instead of accruing.
         "on_submit": "blueline.server_scripts.sales_commission.create_commission_entries",
+        "on_cancel": "blueline.server_scripts.sales_commission.reverse_credit_note",
         "before_cancel": [
             # Approved tax invoices are reversed by Credit Note, never cancelled; the
             # commission guard still covers invoices that never received a serial.

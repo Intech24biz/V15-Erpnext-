@@ -7,6 +7,10 @@
 2. one person can't give both commission approvals;
 3. an approved Sales Invoice is corrected with a Credit Note, not cancelled.
 
+Added from branch `feature/credit-note-commission-approval-roles` (update the manual only once that branch is deployed too):
+
+4. a Credit Note adjusts the sales commission on the invoice automatically (new 3.2a).
+
 Each block below says exactly which part of the manual it replaces or adds to. Text in quotes is the **current** wording, for locating it. Everything under "New text" is ready to paste. Update the manual only once the branch is deployed to production.
 
 Notes for the editor are marked **[Editor]** and are not part of the manual.
@@ -45,7 +49,26 @@ Notes for the editor are marked **[Editor]** and are not part of the manual.
 
 > An approved Sales Invoice can no longer be cancelled; it is corrected with a Credit Note instead (Section 5.3).
 
-**[Editor]** How commission entries should respond to a Credit Note has **not been decided** yet. Today the system creates matching *negative* commission entries for the Credit Note and leaves the original entries unchanged. Add a sentence here once the client has chosen: leave as is, auto-cancel unpaid entries, or flag paid entries for clawback.
+### Add a new section 3.2a directly after 3.2 (from branch `feature/credit-note-commission-approval-roles`)
+
+**New text:**
+
+> **3.2a When goods come back: Credit Notes and commission**
+>
+> When a Credit Note is approved against an invoice, the system adjusts the commission on that invoice by itself. Nobody needs to do anything.
+>
+> - **Commission not yet paid out** (Accrued, Payment Received – Pending Approval, or Approved): the amount goes down in proportion to what was returned. If half the line comes back, the commission halves. If the whole line comes back, the entry is **Cancelled** and its amount becomes zero.
+> - **Commission already paid**: the paid entry stays exactly as it was. The system creates a separate **Deduction** entry for the same person with a negative amount — the share of the commission for the goods that came back. It is marked **Deduct from Next Payout**.
+>
+> Each entry keeps its **Original Commission Amount**, and its **Adjustments** table lists every Credit Note that changed it: the amount before and after, and who approved the Credit Note. Nobody can edit these by hand, and approval ticks are never changed.
+>
+> If the Credit Note is later cancelled, everything is put back: reduced amounts are restored, cancelled entries go back to their earlier status, and its Deduction entries are cancelled. The Adjustments rows stay, marked **Reversed**.
+>
+> Commission entries never post anything to the accounts. Only the Credit Note itself changes the ledger.
+>
+> **Outstanding deductions** are listed per person at the top of the **Sales Commission Register**. Take them off that person's next commission payout. Deductions are not included in the status totals.
+
+**[Editor]** Deductions don't yet have their own approval or payout step; they are listed on the register until they are taken off a payout. Update this paragraph once the payout netting is built.
 
 ---
 
@@ -134,6 +157,7 @@ Notes for the editor are marked **[Editor]** and are not part of the manual.
 | Question | Answer |
 |---|---|
 | I clicked Approve and got "You cannot approve a document you created or sent for approval." Why? | You created this document or sent it for approval, so someone else has to approve it. This is deliberate and applies to every role. |
+| A customer returned goods after the commission was paid. Do I have to fix the commission? | No. Approving the Credit Note creates a Deduction entry for that person automatically. It is listed under Outstanding Deductions on the Sales Commission Register; take it off their next payout. |
 
 ---
 
@@ -165,5 +189,4 @@ Notes for the editor are marked **[Editor]** and are not part of the manual.
 > 6. Click **Actions → Send for Approval**.
 > 7. Another approver opens it and clicks **Actions → Approve**. You can't approve your own Credit Note.
 > 8. Once approved, the sale is reversed in the accounts. The original invoice keeps its number and Tax Invoice serial. If you unticked "Update Outstanding for Self", its status shows **Credit Note Issued**.
->
-> **[Editor]** Add one line on what happens to sales commission once the client decides (see the note under 3.2).
+> 9. The sales commission on the invoice is adjusted automatically (see 3.2a). Commission already paid shows up as a deduction on the Sales Commission Register.

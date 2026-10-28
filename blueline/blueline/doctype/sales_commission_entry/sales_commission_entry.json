@@ -27,10 +27,18 @@
   "column_break_line1",
   "amount",
   "commission_section",
+  "entry_type",
   "commission_rule",
   "commission_type",
   "column_break_comm1",
   "commission_amount",
+  "original_commission_amount",
+  "deduct_from_next_payout",
+  "credit_note_section",
+  "credit_note",
+  "column_break_cn1",
+  "against_commission_entry",
+  "adjustments",
   "approval_section",
   "status",
   "column_break_appr1",
@@ -176,6 +184,17 @@
    "label": "Commission"
   },
   {
+   "default": "Commission",
+   "description": "Commission: earned on a Sales Invoice line. Deduction: created by a Credit Note against commission that was already paid, to be taken off this person's next payout.",
+   "fieldname": "entry_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Entry Type",
+   "options": "Commission\nDeduction",
+   "read_only": 1
+  },
+  {
    "fieldname": "commission_rule",
    "fieldtype": "Link",
    "label": "Commission Rule",
@@ -199,6 +218,62 @@
    "in_list_view": 1,
    "label": "Commission Amount",
    "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "description": "The commission amount as first calculated, before any Credit Note reduced it.",
+   "fieldname": "original_commission_amount",
+   "fieldtype": "Currency",
+   "label": "Original Commission Amount",
+   "no_copy": 1,
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.entry_type == 'Deduction'",
+   "description": "Commission already paid on goods since returned. To be taken off this person's next payout.",
+   "fieldname": "deduct_from_next_payout",
+   "fieldtype": "Check",
+   "label": "Deduct from Next Payout",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:doc.entry_type == 'Deduction' || (doc.adjustments || []).length",
+   "fieldname": "credit_note_section",
+   "fieldtype": "Section Break",
+   "label": "Credit Note Adjustments"
+  },
+  {
+   "depends_on": "eval:doc.entry_type == 'Deduction'",
+   "description": "The Credit Note that created this deduction.",
+   "fieldname": "credit_note",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Credit Note",
+   "options": "Sales Invoice",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_cn1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.entry_type == 'Deduction'",
+   "description": "The paid commission entry this deduction is taken against.",
+   "fieldname": "against_commission_entry",
+   "fieldtype": "Link",
+   "label": "Against Commission Entry",
+   "options": "Sales Commission Entry",
+   "read_only": 1
+  },
+  {
+   "description": "Every change a Credit Note made to this entry, written by the system. A cancelled Credit Note marks its row Reversed.",
+   "fieldname": "adjustments",
+   "fieldtype": "Table",
+   "label": "Adjustments",
+   "options": "Sales Commission Adjustment",
    "read_only": 1
   },
   {
@@ -266,7 +341,7 @@
  "index_web_pages_for_search": 0,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-10-27 00:00:00.000000",
+ "modified": "2026-10-29 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Blueline",
  "name": "Sales Commission Entry",

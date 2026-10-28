@@ -219,22 +219,18 @@ class TestTaxInvoiceSerialIsServerSide(BluelineTestCase):
 		self.assertIn(draft.name.replace("BTAX-", "B"), reload(draft).custom_tax_invoice_serial)
 
 
-class TestCreditNoteCommissionCurrentBehaviour(BluelineTestCase):
-	"""Records what happens to commission today when a Credit Note is raised. Nothing here
-	is a decision: the client is choosing between the options in the report."""
+class TestCreditNoteCommission(BluelineTestCase):
+	"""The rule the client agreed replaced the old behaviour (negative Accrued entries on the
+	Credit Note). Full cover is in test_credit_note_commission."""
 
-	def test_credit_note_accrues_negative_commission_and_leaves_the_original_untouched(self):
+	def test_credit_note_adjusts_the_original_entries_instead_of_accruing_negatives(self):
 		invoice = approved_invoice()
 		original = commission_entries(invoice.name)
 		self.assertEqual(len(original), 3)
 
 		credit_note = approved_credit_note(invoice)
 
-		self.assertEqual(commission_entries(invoice.name), original)
-		reversal = commission_entries(credit_note.name)
-		self.assertEqual(len(reversal), len(original))
-		self.assertEqual(
-			sorted((e.matched_sales_person, -e.commission_amount) for e in reversal),
-			sorted((e.matched_sales_person, e.commission_amount) for e in original),
-		)
-		self.assertTrue(all(e.status == "Accrued" for e in reversal))
+		self.assertEqual(commission_entries(credit_note.name), [])
+		after = commission_entries(invoice.name)
+		self.assertEqual([e.name for e in after], [e.name for e in original])
+		self.assertTrue(all((e.status, e.commission_amount) == ("Cancelled", 0) for e in after))

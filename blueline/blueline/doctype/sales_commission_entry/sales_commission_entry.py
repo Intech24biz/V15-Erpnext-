@@ -6,9 +6,14 @@ from frappe.utils import cint, cstr
 PENDING_APPROVAL_STATUS = "Payment Received - Pending Approval"
 APPROVED_STATUS = "Approved"
 PAID_STATUS = "Paid"
+CANCELLED_STATUS = "Cancelled"
+
+# Set on doc.flags only by sales_commission.py's Credit Note path. `flags` is a reserved key
+# that Frappe never fills from a client payload, so a user request cannot carry it.
+CREDIT_NOTE_ADJUSTMENT_FLAG = "credit_note_adjustment"
 
 # Once an entry reaches one of these, its approval ticks are history and can't change.
-LOCKED_STATUSES = (APPROVED_STATUS, PAID_STATUS)
+LOCKED_STATUSES = (APPROVED_STATUS, PAID_STATUS, CANCELLED_STATUS)
 
 # approval checkbox -> field recording the user who ticked it (set server-side only)
 APPROVAL_TICKS = {
@@ -55,14 +60,45 @@ class SalesCommissionEntry(Document):
 	def validate(self):
 		# Entries are normally created already submitted, but System Manager may still
 		# create one by hand; the same approval rules apply to a draft.
+		if self.original_commission_amount is None:
+			self.original_commission_amount = self.commission_amount
 		self.apply_approval_rules()
+
+	def validate_workflow(self):
+		# A Credit Note can cancel an entry from any state, or restore it, which the
+		# commission workflow has no transition for. Only that system path skips it.
+		if self.flags.get(CREDIT_NOTE_ADJUSTMENT_FLAG):
+			return
+		super().validate_workflow()
 
 	def before_update_after_submit(self):
 		# Ticking either approval checkbox re-saves an already-submitted entry, which
 		# takes this path (not validate()) — see sales_commission.py for why.
+		self.refuse_manual_cancellation()
 		self.apply_approval_rules()
+		if self.flags.get(CREDIT_NOTE_ADJUSTMENT_FLAG):
+			# Cancelling or restoring for a Credit Note never grants an approval.
+			return
 		self.auto_promote_to_approved()
 		self.require_both_approvals()
+
+	def refuse_manual_cancellation(self):
+		# Commission Amount and the Adjustments table are locked after submit by Frappe
+		# itself; the Credit Note path lifts that lock for its own save only. Status is
+		# editable after submit (Mark as Paid), so moving it to or from Cancelled — which
+		# only a Credit Note does — is refused here for every user, Administrator included.
+		if self.flags.get(CREDIT_NOTE_ADJUSTMENT_FLAG):
+			return
+		before = self.get_doc_before_save()
+		if not before or before.status == self.status:
+			return
+		if CANCELLED_STATUS in (before.status, self.status):
+			frappe.throw(
+				_("{0} can only be set to or from {1} by approving or cancelling a Credit Note.").format(
+					frappe.bold(_("Status")), frappe.bold(_(CANCELLED_STATUS))
+				),
+				title=_("Changed by Credit Note Only"),
+			)
 
 	def apply_approval_rules(self):
 		# These hold for every user and role (Administrator and System Manager included)

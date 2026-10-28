@@ -20,6 +20,7 @@ SUITES = (
 	"test_self_approval",
 	"test_commission_approvers",
 	"test_credit_note",
+	"test_credit_note_commission",
 	"test_item5_commission_matching",
 	"test_coa_valuation_method",
 )

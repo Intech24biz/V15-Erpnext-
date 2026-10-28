@@ -1,9 +1,20 @@
 import frappe
 from frappe import _
-from frappe.utils import flt
+from frappe.utils import flt, fmt_money, now_datetime
+
+from blueline.blueline.doctype.sales_commission_entry.sales_commission_entry import (
+	CREDIT_NOTE_ADJUSTMENT_FLAG,
+)
 
 RULE_DOCTYPE = "Sales Commission Rule"
 ENTRY_DOCTYPE = "Sales Commission Entry"
+
+COMMISSION_TYPE = "Commission"
+DEDUCTION_TYPE = "Deduction"
+
+REDUCED = "Reduced"
+CANCELLED_BY_CREDIT_NOTE = "Cancelled"
+DEDUCTION_CREATED = "Deduction Created"
 
 FIXED_AMOUNT = "Fixed Amount Per Unit"
 PERCENTAGE = "Percentage of Line Value"
@@ -23,6 +34,10 @@ BLOCK_CANCEL_STATUSES = {APPROVED_STATUS, PAID_STATUS}
 # Same roles that hold permlevel-3 write on Sales Commission Entry (status/payment_entry).
 MARK_PAID_ROLES = {"System Manager", "Financial Manager"}
 
+# Commission not yet paid out is reduced in place by a Credit Note; paid commission gets a
+# separate negative Deduction entry instead, since what was paid can't be un-paid.
+UNPAID_STATUSES = {ACCRUED_STATUS, PENDING_APPROVAL_STATUS, APPROVED_STATUS}
+
 
 def create_commission_entries(doc, method=None):
 	"""Sales Invoice `on_submit`: accrue commission for every item row that matches an
@@ -32,7 +47,14 @@ def create_commission_entries(doc, method=None):
 	One sale can pay several people: every rule at the first matching tier gets its own
 	entry. A line with no matching rule is logged and skipped — this must never block
 	the invoice submission itself.
+
+	A Credit Note accrues nothing of its own: it adjusts the original invoice's entries
+	instead (see apply_credit_note), so a return is never counted twice.
 	"""
+	if doc.get("is_return"):
+		apply_credit_note(doc)
+		return
+
 	for item in doc.items:
 		try:
 			_process_line(doc, item)
@@ -85,6 +107,7 @@ def _process_line(invoice, item):
 
 
 def _create_entry(invoice, item, rule):
+	commission_amount = _calculate_commission(rule, item)
 	entry = frappe.get_doc(
 		{
 			"doctype": ENTRY_DOCTYPE,
@@ -101,7 +124,8 @@ def _create_entry(invoice, item, rule):
 			"amount": item.amount,
 			"commission_rule": rule.name,
 			"commission_type": rule.commission_type,
-			"commission_amount": _calculate_commission(rule, item),
+			"commission_amount": commission_amount,
+			"original_commission_amount": commission_amount,
 			"status": ACCRUED_STATUS,
 		}
 	)
@@ -192,7 +216,7 @@ def _release_entries_for_invoice(invoice_name):
 	# to the get_list rule.
 	entry_names = frappe.get_all(
 		ENTRY_DOCTYPE,
-		filters={"sales_invoice": invoice_name, "status": ACCRUED_STATUS},
+		filters={"sales_invoice": invoice_name, "status": ACCRUED_STATUS, "entry_type": COMMISSION_TYPE},
 		pluck="name",
 	)
 	for entry_name in entry_names:
@@ -262,6 +286,262 @@ def guard_commission_entries_on_cancel(doc, method=None):
 			)
 
 
+def apply_credit_note(credit_note):
+	"""Credit Note `on_submit` (reached through create_commission_entries): adjust the
+	commission accrued on the original invoice in proportion to the line amount returned.
+
+	- Accrued / Payment Received - Pending Approval / Approved: Commission Amount is reduced
+	  in place. A full return cancels the entry (status Cancelled; it stays submitted so a
+	  cancelled Credit Note can restore it). Approval ticks are never touched.
+	- Paid: a separate negative Deduction entry is created for the same person, flagged
+	  Deduct from Next Payout and linked to the Credit Note and to the paid entry.
+
+	Every change is written to the entry's Adjustments table and its Version history, with
+	the approving user. Nothing here reads or writes any accounting record. Like accrual,
+	a failure is logged and never blocks the Credit Note itself; it is all-or-nothing, so
+	no entry is left half-adjusted.
+	"""
+	if not credit_note.return_against:
+		return
+	returned = _returned_amount_by_line(credit_note)
+	if not returned:
+		return
+
+	# get_all, matching _release_entries_for_invoice: the system's own records for this
+	# specific invoice, which must be adjusted whoever approved the Credit Note.
+	entry_names = frappe.get_all(
+		ENTRY_DOCTYPE,
+		filters={
+			"sales_invoice": credit_note.return_against,
+			"sales_invoice_item": ["in", list(returned)],
+			"entry_type": COMMISSION_TYPE,
+			"docstatus": 1,
+		},
+		pluck="name",
+		order_by="name asc",
+	)
+	savepoint = "blueline_credit_note_commission"
+	frappe.db.savepoint(savepoint)
+	try:
+		for entry_name in entry_names:
+			entry = frappe.get_doc(ENTRY_DOCTYPE, entry_name)
+			_adjust_entry(entry, credit_note, returned[entry.sales_invoice_item])
+	except Exception:
+		frappe.db.rollback(save_point=savepoint)
+		frappe.log_error(
+			title=f"Sales Commission credit note adjustment failed: {credit_note.name}",
+			message=frappe.get_traceback(),
+		)
+
+
+def _returned_amount_by_line(credit_note):
+	"""{original Sales Invoice Item name: line amount returned}. ERPNext's Return / Credit
+	Note mapper links each row back to its original line; a row added by hand is matched by
+	item code when that item appears on exactly one original line."""
+	original_lines = frappe.get_all(
+		"Sales Invoice Item",
+		filters={"parent": credit_note.return_against, "parenttype": "Sales Invoice"},
+		fields=["name", "item_code"],
+	)
+	known = {line.name for line in original_lines}
+	by_item_code = {}
+	for line in original_lines:
+		by_item_code.setdefault(line.item_code, []).append(line.name)
+
+	returned = {}
+	for item in credit_note.items:
+		amount = -flt(item.amount)
+		if amount <= 0:
+			continue
+		line = item.get("sales_invoice_item")
+		if line not in known:
+			candidates = by_item_code.get(item.item_code, [])
+			line = candidates[0] if len(candidates) == 1 else None
+		if not line:
+			frappe.log_error(
+				title=f"Sales Commission: credit note line not matched ({credit_note.name} / {item.item_code})",
+				message=(
+					f"Credit Note row {item.idx} ({item.item_code}) could not be matched to a line on "
+					f"{credit_note.return_against}. No commission was adjusted for this row."
+				),
+			)
+			continue
+		returned[line] = returned.get(line, 0) + amount
+	return returned
+
+
+def _adjust_entry(entry, credit_note, returned_amount):
+	line_amount = flt(entry.amount)
+	if line_amount <= 0 or entry.status not in UNPAID_STATUSES | {PAID_STATUS}:
+		return
+
+	precision = entry.precision("commission_amount")
+	original = flt(entry.original_commission_amount)
+	if not original and not entry.adjustments:
+		original = flt(entry.commission_amount)  # entry accrued before this field existed
+
+	active = [row for row in entry.adjustments if not row.reversed]
+	returned_before = sum(flt(row.returned_amount) for row in active)
+	returned_now = min(flt(returned_amount), line_amount - returned_before)
+	if returned_now <= 0:
+		return
+
+	# Computed from the original amount and the total returned so far, so several partial
+	# Credit Notes on one line add up exactly to the original commission, with no drift.
+	full_return = flt(returned_before + returned_now, precision) >= flt(line_amount, precision)
+	target = original if full_return else original * (returned_before + returned_now) / line_amount
+	adjustment = flt(target - sum(flt(row.adjustment_amount) for row in active), precision)
+
+	row = {
+		"credit_note": credit_note.name,
+		"returned_amount": returned_now,
+		"adjustment_amount": adjustment,
+		"amount_before": entry.commission_amount,
+		"status_before": entry.status,
+		"adjusted_by": frappe.session.user,
+		"adjusted_on": now_datetime(),
+	}
+
+	if entry.status == PAID_STATUS:
+		deduction = _create_deduction(entry, credit_note, returned_now, adjustment)
+		row.update(adjustment_type=DEDUCTION_CREATED, deduction_entry=deduction.name)
+		comment = _("Commission already paid: Deduction {0} of {1} created by Credit Note {2}.").format(
+			deduction.name, fmt_money(adjustment, precision), credit_note.name
+		)
+	elif full_return:
+		entry.commission_amount = 0
+		entry.status = CANCELLED_STATUS
+		row.update(adjustment_type=CANCELLED_BY_CREDIT_NOTE)
+		comment = _("Cancelled by Credit Note {0} (full return).").format(credit_note.name)
+	else:
+		entry.commission_amount = flt(flt(entry.commission_amount) - adjustment, precision)
+		row.update(adjustment_type=REDUCED)
+		comment = _("Commission reduced by {0} by Credit Note {1}.").format(
+			fmt_money(adjustment, precision), credit_note.name
+		)
+
+	row.update(amount_after=entry.commission_amount, status_after=entry.status)
+	entry.original_commission_amount = original
+	entry.append("adjustments", row)
+	_save_credit_note_change(entry, comment)
+
+
+def _create_deduction(entry, credit_note, returned_amount, amount):
+	deduction = frappe.get_doc(
+		{
+			"doctype": ENTRY_DOCTYPE,
+			"entry_type": DEDUCTION_TYPE,
+			"deduct_from_next_payout": 1,
+			"credit_note": credit_note.name,
+			"against_commission_entry": entry.name,
+			"sales_invoice": entry.sales_invoice,
+			"sales_invoice_item": entry.sales_invoice_item,
+			"posting_date": credit_note.posting_date,
+			"matched_sales_person": entry.matched_sales_person,
+			"commission_credited_to": entry.commission_credited_to,
+			"customer": entry.customer,
+			"item_code": entry.item_code,
+			"company": entry.company,
+			"rate": entry.rate,
+			"amount": -returned_amount,
+			"commission_rule": entry.commission_rule,
+			"commission_type": entry.commission_type,
+			"commission_amount": -amount,
+			"original_commission_amount": -amount,
+			"status": ACCRUED_STATUS,
+		}
+	)
+	deduction.insert(ignore_permissions=True)
+	deduction.submit()
+	return deduction
+
+
+def reverse_credit_note(doc, method=None):
+	"""Sales Invoice `on_cancel`: a cancelled Credit Note gives back exactly what it took —
+	reduced amounts are restored, entries it cancelled return to their previous status,
+	and the Deduction entries it created are cancelled. Its Adjustments rows stay, marked
+	Reversed. Unlike accrual this blocks on failure: a cancelled Credit Note must not leave
+	commission reduced with nothing behind it.
+	"""
+	if not doc.get("is_return"):
+		return
+
+	entry_names = frappe.get_all(
+		"Sales Commission Adjustment",
+		filters={"parenttype": ENTRY_DOCTYPE, "credit_note": doc.name, "reversed": 0},
+		pluck="parent",
+	)
+	for entry_name in sorted(set(entry_names)):
+		try:
+			_reverse_entry(frappe.get_doc(ENTRY_DOCTYPE, entry_name), doc)
+		except Exception:
+			frappe.log_error(
+				title=f"Sales Commission credit note reversal failed: {entry_name}",
+				message=frappe.get_traceback(),
+			)
+			frappe.throw(
+				_("Could not restore Sales Commission Entry {0} for this Credit Note. See Error Log.").format(
+					entry_name
+				)
+			)
+
+	# The Adjustments rows and Deduction entries above still link to this Credit Note by
+	# design (they are its audit trail), which Frappe would otherwise treat as blocking.
+	doc.ignore_linked_doctypes = (*(doc.get("ignore_linked_doctypes") or ()), ENTRY_DOCTYPE)
+
+
+def _reverse_entry(entry, credit_note):
+	precision = entry.precision("commission_amount")
+	restored = []
+	for row in entry.adjustments:
+		if row.credit_note != credit_note.name or row.reversed:
+			continue
+		if row.adjustment_type == DEDUCTION_CREATED:
+			_cancel_deduction(row.deduction_entry, credit_note)
+		else:
+			entry.commission_amount = flt(flt(entry.commission_amount) + flt(row.adjustment_amount), precision)
+		row.reversed = 1
+		row.reversed_by = frappe.session.user
+		row.reversed_on = now_datetime()
+		restored.append(row)
+
+	if entry.status == CANCELLED_STATUS and flt(entry.commission_amount) > 0:
+		# No longer fully returned: back to the status it had when a Credit Note cancelled it.
+		cancelling = [row for row in entry.adjustments if row.adjustment_type == CANCELLED_BY_CREDIT_NOTE]
+		entry.status = cancelling[-1].status_before
+
+	_save_credit_note_change(
+		entry, _("Credit Note {0} was cancelled: its adjustment was reversed.").format(credit_note.name)
+	)
+
+
+def _cancel_deduction(deduction_name, credit_note):
+	deduction = frappe.get_doc(ENTRY_DOCTYPE, deduction_name)
+	if deduction.docstatus != 1:
+		return
+	deduction.flags.ignore_permissions = True
+	# The paid entry's Adjustments row links here: that's the audit trail, not a dependency.
+	deduction.ignore_linked_doctypes = (ENTRY_DOCTYPE,)
+	deduction.cancel()
+	deduction.add_comment(
+		"Info", _("Cancelled automatically: Credit Note {0} was cancelled.").format(credit_note.name)
+	)
+
+
+def _save_credit_note_change(entry, comment):
+	"""The single place a Credit Note writes to an existing entry. Commission Amount and the
+	Adjustments table are locked after submit for everyone; only this save lifts that lock
+	(and the commission workflow, which has no Cancelled state). Version history is kept."""
+	entry.flags.ignore_permissions = True
+	entry.flags.ignore_validate_update_after_submit = True
+	entry.flags[CREDIT_NOTE_ADJUSTMENT_FLAG] = True
+	# A reversal's rows point at the Credit Note and Deduction it has just cancelled, which
+	# Frappe's link check refuses; every value saved here is set by this module.
+	entry.flags.ignore_links = True
+	entry.save(ignore_version=False)
+	entry.add_comment("Info", comment)
+
+
 @frappe.whitelist()
 def mark_commission_entry_paid(commission_entry, payment_entry):
 	"""Manual action: link an Approved commission entry to the real Payment Entry that
@@ -277,6 +557,12 @@ def mark_commission_entry_paid(commission_entry, payment_entry):
 
 	if entry.status != APPROVED_STATUS:
 		frappe.throw(_("Only an Approved commission entry can be marked as Paid."))
+
+	if entry.entry_type == DEDUCTION_TYPE:
+		# A deduction is settled by netting it off a later payout, which is not built yet.
+		frappe.throw(
+			_("{0} is a deduction. Deductions are taken off a payout, not marked as Paid.").format(entry.name)
+		)
 
 	pe = frappe.db.get_value("Payment Entry", payment_entry, ["name", "docstatus"], as_dict=True)
 	if not pe or pe.docstatus != 1:

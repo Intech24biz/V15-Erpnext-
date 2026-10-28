@@ -1,0 +1,157 @@
+{
+ "actions": [],
+ "creation": "2026-10-29 00:00:00.000000",
+ "description": "One Credit Note's effect on a Sales Commission Entry. Written only by the system when a Credit Note is approved, and marked reversed if that Credit Note is cancelled. Never edited by hand.",
+ "doctype": "DocType",
+ "editable_grid": 0,
+ "engine": "InnoDB",
+ "field_order": [
+  "credit_note",
+  "adjustment_type",
+  "returned_amount",
+  "adjustment_amount",
+  "column_break_1",
+  "amount_before",
+  "amount_after",
+  "status_before",
+  "status_after",
+  "deduction_entry",
+  "section_break_audit",
+  "adjusted_by",
+  "adjusted_on",
+  "column_break_2",
+  "reversed",
+  "reversed_by",
+  "reversed_on"
+ ],
+ "fields": [
+  {
+   "columns": 2,
+   "fieldname": "credit_note",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Credit Note",
+   "options": "Sales Invoice",
+   "read_only": 1
+  },
+  {
+   "columns": 2,
+   "fieldname": "adjustment_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Adjustment",
+   "options": "Reduced\nCancelled\nDeduction Created",
+   "read_only": 1
+  },
+  {
+   "description": "Line amount returned by this Credit Note against the invoice line this commission was calculated from.",
+   "fieldname": "returned_amount",
+   "fieldtype": "Currency",
+   "label": "Returned Line Amount",
+   "read_only": 1
+  },
+  {
+   "columns": 2,
+   "description": "Commission taken off this entry (Reduced / Cancelled), or put on the deduction entry (Deduction Created).",
+   "fieldname": "adjustment_amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Commission Adjusted",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "amount_before",
+   "fieldtype": "Currency",
+   "label": "Commission Before",
+   "read_only": 1
+  },
+  {
+   "fieldname": "amount_after",
+   "fieldtype": "Currency",
+   "label": "Commission After",
+   "read_only": 1
+  },
+  {
+   "fieldname": "status_before",
+   "fieldtype": "Data",
+   "label": "Status Before",
+   "read_only": 1
+  },
+  {
+   "fieldname": "status_after",
+   "fieldtype": "Data",
+   "label": "Status After",
+   "read_only": 1
+  },
+  {
+   "columns": 2,
+   "fieldname": "deduction_entry",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Deduction Entry",
+   "options": "Sales Commission Entry",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_audit",
+   "fieldtype": "Section Break"
+  },
+  {
+   "description": "The user whose approval of the Credit Note triggered this adjustment.",
+   "fieldname": "adjusted_by",
+   "fieldtype": "Link",
+   "label": "Adjusted By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "adjusted_on",
+   "fieldtype": "Datetime",
+   "label": "Adjusted On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "columns": 1,
+   "default": "0",
+   "description": "Ticked when the Credit Note was cancelled and this adjustment was undone.",
+   "fieldname": "reversed",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Reversed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "reversed_by",
+   "fieldtype": "Link",
+   "label": "Reversed By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "reversed_on",
+   "fieldtype": "Datetime",
+   "label": "Reversed On",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-10-29 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Blueline",
+ "name": "Sales Commission Adjustment",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
