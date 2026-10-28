@@ -113,6 +113,22 @@ class TestWorkflowsSurviveMigrate(WorkflowTestCase):
 			"GI Sales Dept 2", [r.receiver_by_role for r in frappe.get_doc("Notification", PO_NOTIFICATION).recipients]
 		)
 
+	def test_fresh_install_syncs_fixtures_before_seeding(self):
+		"""install-app calls after_install before its own fixture sync; the seeded workflows
+		need the fixture Roles / Workflow States / Actions to exist first."""
+		from unittest import mock
+
+		import blueline.setup
+
+		calls = []
+		with (
+			mock.patch.object(blueline.setup, "sync_fixtures", lambda app: calls.append(("fixtures", app))),
+			mock.patch.object(blueline.setup, "create_missing_seed_records", lambda: calls.append(("seed",))),
+			mock.patch.object(frappe, "msgprint"),
+		):
+			blueline.setup.after_install()
+		self.assertEqual(calls, [("fixtures", "blueline"), ("seed",)])
+
 	def test_migrate_recreates_only_what_is_missing(self):
 		frappe.delete_doc("Notification", "GI Petty Cash Pending Approval", ignore_permissions=True)
 		set_approve_roles(["GI Management"], name="GI Quotation Approval")
