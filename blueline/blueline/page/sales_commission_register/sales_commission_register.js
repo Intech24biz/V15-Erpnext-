@@ -131,12 +131,16 @@ blueline.SalesCommissionRegister = class SalesCommissionRegister {
 				.sales-commission-register .scr-badge-paid { background: var(--bg-green, #e4f5e9); color: var(--text-on-green, #2f7a4d); }
 				.sales-commission-register .scr-badge-cancelled { background: var(--bg-red, #fde7e7); color: var(--text-on-red, #b8362f); }
 				.sales-commission-register .scr-empty { text-align: center; padding: 50px 15px; color: var(--text-muted); }
+				.sales-commission-register .scr-deductions { margin-bottom: 20px; }
+				.sales-commission-register .scr-section-title { font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+				.sales-commission-register .scr-original { font-size: 11px; color: var(--text-muted); }
 			</style>`).appendTo("head");
 		}
 
 		this.body = $(`
 			<div class="sales-commission-register">
 				<div class="row scr-summary"></div>
+				<div class="scr-deductions"></div>
 				<div class="scr-table-wrapper"></div>
 			</div>
 		`).appendTo(this.page.body);
@@ -159,7 +163,51 @@ blueline.SalesCommissionRegister = class SalesCommissionRegister {
 
 	render(data) {
 		this.render_summary(data.summary, data.status_options);
+		this.render_deductions(data.deductions);
 		this.render_table(data.entries);
+	}
+
+	render_deductions(deductions) {
+		const currency = frappe.defaults.get_default("currency");
+		const $el = this.body.find(".scr-deductions").empty();
+		if (!deductions || !deductions.length) {
+			return;
+		}
+
+		const table = $(`
+			<div>
+				<div class="scr-section-title">${__("Outstanding Deductions (deduct from next payout)")}</div>
+				<table class="table table-bordered">
+					<thead>
+						<tr>
+							<th>${__("Credited To")}</th>
+							<th>${__("Company")}</th>
+							<th class="text-right">${__("Amount to Deduct")}</th>
+							<th>${__("Deduction Entries")}</th>
+						</tr>
+					</thead>
+					<tbody></tbody>
+				</table>
+			</div>
+		`).appendTo($el);
+		const $tbody = table.find("tbody");
+
+		deductions.forEach((row) => {
+			const links = row.entries
+				.map(
+					(e) =>
+						`<a href="/app/sales-commission-entry/${encodeURIComponent(e.name)}">${frappe.utils.escape_html(e.name)}</a> ${this.status_badge(e.status)}`
+				)
+				.join("<br>");
+			$(`
+				<tr>
+					<td>${frappe.utils.escape_html(row.commission_credited_to || "")}</td>
+					<td>${frappe.utils.escape_html(row.company || "")}</td>
+					<td class="text-right">${format_currency(-row.amount, currency)}</td>
+					<td>${links}</td>
+				</tr>
+			`).appendTo($tbody);
+		});
 	}
 
 	render_summary(summary, status_options) {
@@ -216,6 +264,7 @@ blueline.SalesCommissionRegister = class SalesCommissionRegister {
 						<th class="text-right">${__("Qty")}</th>
 						<th class="text-right">${__("Line Amount")}</th>
 						<th class="text-right">${__("Commission")}</th>
+						<th>${__("Type")}</th>
 						<th>${__("Status")}</th>
 						<th>${__("Payment Entry")}</th>
 					</tr>
@@ -226,6 +275,17 @@ blueline.SalesCommissionRegister = class SalesCommissionRegister {
 		const $tbody = table.find("tbody");
 
 		rows.forEach((row) => {
+			const adjusted =
+				row.entry_type !== "Deduction" &&
+				row.original_commission_amount &&
+				row.original_commission_amount !== row.commission_amount;
+			const original = adjusted
+				? `<div class="scr-original">${__("was {0}", [format_currency(row.original_commission_amount, currency)])}</div>`
+				: "";
+			const type =
+				row.entry_type === "Deduction"
+					? `${__("Deduction")}<div class="scr-original">${frappe.utils.escape_html(row.credit_note || "")}</div>`
+					: __("Commission");
 			$(`
 				<tr>
 					<td><a href="/app/sales-commission-entry/${encodeURIComponent(row.name)}">${frappe.utils.escape_html(row.name)}</a></td>
@@ -238,7 +298,8 @@ blueline.SalesCommissionRegister = class SalesCommissionRegister {
 					<td>${frappe.utils.escape_html(row.company || "")}</td>
 					<td class="text-right">${row.qty}</td>
 					<td class="text-right">${format_currency(row.amount, currency)}</td>
-					<td class="text-right">${format_currency(row.commission_amount, currency)}</td>
+					<td class="text-right">${format_currency(row.commission_amount, currency)}${original}</td>
+					<td>${type}</td>
 					<td>${this.status_badge(row.status)}</td>
 					<td>${row.payment_entry ? frappe.utils.escape_html(row.payment_entry) : ""}</td>
 				</tr>

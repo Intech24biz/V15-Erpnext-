@@ -10,6 +10,11 @@ app_version = app_version
 
 required_apps = ["erpnext"]
 
+# Workflows ("GI ...") and their pending-approval Notifications are deliberately NOT fixtures:
+# Frappe re-imports fixtures with force=True on every bench migrate, which put back the
+# shipped approver roles over any change a System Manager had made on site. They are
+# seeded from blueline/setup_data/ by setup.after_migrate, insert-only. To change them on
+# an existing site, use the Workflow / Notification screen (or a patch), not those files.
 fixtures = [
     {"doctype": "Custom Field", "filters": [["module", "=", "Blueline"]]},
     {
@@ -25,7 +30,6 @@ fixtures = [
             ]],
         ],
     },
-    {"doctype": "Workflow", "filters": [["name", "like", "GI %"]]},
     {
         "doctype": "Workflow State",
         "filters": [["name", "in", [
@@ -47,27 +51,61 @@ fixtures = [
             "Mark as Paid",
         ]]],
     },
-    {"doctype": "Notification", "filters": [["name", "like", "GI %"]]},
     {"doctype": "Workspace", "filters": [["name", "=", "Blueline Control Center"]]},
 ]
 
 doc_events = {
+    "Workflow": {
+        "validate": "blueline.server_scripts.workflow_guard.only_system_manager",
+        "on_trash": "blueline.server_scripts.workflow_guard.only_system_manager",
+    },
     "Quotation": {
-        "before_submit": "blueline.server_scripts.approval_enforcement.enforce_approval",
-    },
-    "Purchase Order": {
-        "before_submit": "blueline.server_scripts.approval_enforcement.enforce_approval",
-    },
-    "Sales Invoice": {
+        "validate": "blueline.server_scripts.self_approval.record_sender",
         "before_submit": [
-            "blueline.server_scripts.tax_invoice_serial.generate_serial_number",
+            "blueline.server_scripts.self_approval.block_self_approval",
             "blueline.server_scripts.approval_enforcement.enforce_approval",
         ],
+    },
+    "Purchase Order": {
+        "validate": "blueline.server_scripts.self_approval.record_sender",
+        "before_submit": [
+            "blueline.server_scripts.self_approval.block_self_approval",
+            "blueline.server_scripts.approval_enforcement.enforce_approval",
+        ],
+    },
+    "Sales Invoice": {
+        "before_insert": "blueline.server_scripts.tax_invoice_serial.set_credit_note_series",
+        "validate": [
+            "blueline.server_scripts.self_approval.record_sender",
+            "blueline.server_scripts.tax_invoice_serial.validate_serial_and_series",
+        ],
+        "before_submit": [
+            "blueline.server_scripts.self_approval.block_self_approval",
+            "blueline.server_scripts.tax_invoice_serial.generate_serial_number",
+            "blueline.server_scripts.approval_enforcement.enforce_approval",
+            # Last: nothing the Credit Note's submission writes may come before it.
+            "blueline.server_scripts.sales_commission.mark_credit_note_savepoint",
+        ],
+        # On a Credit Note this adjusts the original invoice's commission instead of accruing.
         "on_submit": "blueline.server_scripts.sales_commission.create_commission_entries",
-        "before_cancel": "blueline.server_scripts.sales_commission.guard_commission_entries_on_cancel",
+        "on_cancel": "blueline.server_scripts.sales_commission.reverse_credit_note",
+        "before_cancel": [
+            # Approved tax invoices are reversed by Credit Note, never cancelled; the
+            # commission guard still covers invoices that never received a serial.
+            "blueline.server_scripts.tax_invoice_serial.block_cancel_of_tax_invoice",
+            "blueline.server_scripts.sales_commission.guard_commission_entries_on_cancel",
+        ],
+    },
+    "Petty Cash Voucher": {
+        "validate": "blueline.server_scripts.self_approval.record_sender",
+        "before_submit": "blueline.server_scripts.self_approval.block_self_approval",
     },
     "Payment Entry": {
-        "before_submit": "blueline.server_scripts.approval_enforcement.enforce_approval",
+        "validate": "blueline.server_scripts.self_approval.record_sender",
+        "before_submit": [
+            "blueline.server_scripts.self_approval.block_self_approval",
+            "blueline.server_scripts.approval_enforcement.enforce_approval",
+        ],
         "on_submit": "blueline.server_scripts.sales_commission.release_commission_entries",
         # Payment Reconciliation can update an already-submitted Payment Entry's
         # references without re-firing on_submit; this catches that path too.

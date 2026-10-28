@@ -5,6 +5,21 @@ from frappe.utils import cint, cstr
 
 PENDING_APPROVAL_STATUS = "Payment Received - Pending Approval"
 APPROVED_STATUS = "Approved"
+PAID_STATUS = "Paid"
+CANCELLED_STATUS = "Cancelled"
+
+# Set on doc.flags only by sales_commission.py's Credit Note path. `flags` is a reserved key
+# that Frappe never fills from a client payload, so a user request cannot carry it.
+CREDIT_NOTE_ADJUSTMENT_FLAG = "credit_note_adjustment"
+
+# Once an entry reaches one of these, its approval ticks are history and can't change.
+LOCKED_STATUSES = (APPROVED_STATUS, PAID_STATUS, CANCELLED_STATUS)
+
+# approval checkbox -> field recording the user who ticked it (set server-side only)
+APPROVAL_TICKS = {
+	"approved_by_management": "management_approved_by",
+	"approved_by_technical": "technical_approved_by",
+}
 
 
 class SalesCommissionEntry(Document):
@@ -42,11 +57,100 @@ class SalesCommissionEntry(Document):
 				title=_("Not Permitted"),
 			)
 
+	def validate(self):
+		# Entries are normally created already submitted, but System Manager may still
+		# create one by hand; the same approval rules apply to a draft.
+		if self.original_commission_amount is None:
+			self.original_commission_amount = self.commission_amount
+		self.apply_approval_rules()
+
+	def validate_workflow(self):
+		# A Credit Note can cancel an entry from any state, or restore it, which the
+		# commission workflow has no transition for. Only that system path skips it.
+		if self.flags.get(CREDIT_NOTE_ADJUSTMENT_FLAG):
+			return
+		super().validate_workflow()
+
 	def before_update_after_submit(self):
 		# Ticking either approval checkbox re-saves an already-submitted entry, which
 		# takes this path (not validate()) — see sales_commission.py for why.
+		self.refuse_manual_cancellation()
+		self.apply_approval_rules()
+		if self.flags.get(CREDIT_NOTE_ADJUSTMENT_FLAG):
+			# Cancelling or restoring for a Credit Note never grants an approval.
+			return
 		self.auto_promote_to_approved()
 		self.require_both_approvals()
+
+	def refuse_manual_cancellation(self):
+		# Commission Amount and the Adjustments table are locked after submit by Frappe
+		# itself; the Credit Note path lifts that lock for its own save only. Status is
+		# editable after submit (Mark as Paid), so moving it to or from Cancelled — which
+		# only a Credit Note does — is refused here for every user, Administrator included.
+		if self.flags.get(CREDIT_NOTE_ADJUSTMENT_FLAG):
+			return
+		before = self.get_doc_before_save()
+		if not before or before.status == self.status:
+			return
+		if CANCELLED_STATUS in (before.status, self.status):
+			frappe.throw(
+				_("{0} can only be set to or from {1} by approving or cancelling a Credit Note.").format(
+					frappe.bold(_("Status")), frappe.bold(_(CANCELLED_STATUS))
+				),
+				title=_("Changed by Credit Note Only"),
+			)
+
+	def apply_approval_rules(self):
+		# These hold for every user and role (Administrator and System Manager included)
+		# and for system saves that set ignore_permissions.
+		self.lock_approvals_once_approved()
+		self.record_approvers()
+		self.refuse_same_approver()
+
+	def lock_approvals_once_approved(self):
+		before = self.get_doc_before_save()
+		if not before or before.status not in LOCKED_STATUSES:
+			return
+		for tick in APPROVAL_TICKS:
+			if cint(self.get(tick)) != cint(before.get(tick)):
+				frappe.throw(
+					_("{0} cannot be changed once the entry is {1}.").format(
+						frappe.bold(_(self.meta.get_label(tick))), _(before.status)
+					),
+					title=_("Approval Locked"),
+				)
+
+	def record_approvers(self):
+		# The "... Approval By" fields are read_only only in the UI, so whatever the client
+		# sent is discarded: a tick going 0 -> 1 records the session user, a cleared tick
+		# clears it, and an unchanged tick keeps the stored value.
+		before = self.get_doc_before_save()
+		for tick, approver_field in APPROVAL_TICKS.items():
+			ticked_before = cint(before.get(tick)) if before else 0
+			if not cint(self.get(tick)):
+				self.set(approver_field, None)
+			elif not ticked_before:
+				self.set(approver_field, frappe.session.user)
+			else:
+				self.set(approver_field, before.get(approver_field))
+
+	def refuse_same_approver(self):
+		before = self.get_doc_before_save()
+		if before and before.status in LOCKED_STATUSES:
+			return
+		if not (self.approved_by_management and self.approved_by_technical):
+			return
+		if self.management_approved_by and self.management_approved_by == self.technical_approved_by:
+			frappe.throw(
+				_(
+					"{0} and {1} must be given by two different users. {2} cannot give both approvals."
+				).format(
+					frappe.bold(_("Approved by Management")),
+					frappe.bold(_("Approved by Technical")),
+					frappe.bold(self.management_approved_by),
+				),
+				title=_("Same User Cannot Give Both Approvals"),
+			)
 
 	def auto_promote_to_approved(self):
 		# The matching Pending Approval -> Approved transitions in the workflow fixture
@@ -76,6 +180,16 @@ class SalesCommissionEntry(Document):
 				_("Both approvals are required before this entry can be Approved: tick {0} and {1}.").format(
 					frappe.bold(_("Approved by Management")), frappe.bold(_("Approved by Technical"))
 				),
+				title=_("Approval Incomplete"),
+			)
+		# Ticks given before approvers were recorded (and not recoverable from the version
+		# history) can't be proven to come from two people, so they don't count.
+		if not (self.management_approved_by and self.technical_approved_by):
+			frappe.throw(
+				_(
+					"This entry's approvals were given before the approving users were recorded. "
+					"Untick {0} and {1} and have two different users tick them again."
+				).format(frappe.bold(_("Approved by Management")), frappe.bold(_("Approved by Technical"))),
 				title=_("Approval Incomplete"),
 			)
 
