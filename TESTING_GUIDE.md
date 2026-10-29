@@ -12,6 +12,7 @@
 >
 > **Updated 2026-10-29 (branch `feature/credit-note-commission-approval-roles`, not deployed):**
 > - **Credit Notes now adjust commission** (K11 resolved). Approving a Credit Note reduces the original invoice's unpaid commission entries in proportion to what was returned (a full return cancels them), and creates a negative **Deduction** entry for commission that was already paid. Cancelling the Credit Note undoes all of it. No ledger entries are involved. New section **2.9**; changed **2.8** step 5 and **3.7** step 12.
+> - **Credit Notes are applied with Payment Reconciliation** (new **3.7 C**; 2.8 step 4 changed). Production's ERPNext has no "Update Outstanding for Self" option, so a Credit Note always stands on the customer's account until the accountant reconciles it against the invoice. **Commission is now released whenever the invoice's outstanding reaches 0 by any route** — payment, reconciliation, Journal Entry, in any order — and never earlier.
 > - **Deduction entries need the two-person approval** (start in *Payment Received - Pending Approval*), and **a Credit Note whose commission can't be adjusted is refused** with *"Commission could not be adjusted for this Credit Note; nothing was changed. Contact the administrator."* — nothing is half-done. See 2.9 C and H.
 > - **Approver roles are changed in the Workflow screen and stay changed.** Previously every update (bench migrate) silently put the shipped approver roles and notification recipients back. Workflows and pending-approval notifications are now only created if missing, never overwritten; only a System Manager can edit a workflow, and each change is recorded. New section **3.8**.
 
@@ -318,7 +319,7 @@ This combination has **three** rules: the rep and two customer-side payees under
 1. **Commission entries that are Approved or Paid** (from 2.4/2.6): as **ceo@**, open each → **Cancel** → confirm. **Expected:** Status **Cancelled**.
 2. **Payment Entry** (from 2.3): as **ceo@**, open → **Cancel**. **Expected:** Cancelled; the invoice goes back to Unpaid/Overdue.
 3. **Sales Invoices** (2.2 and 2.7): as **ceo@**, open → **Cancel**. **Expected: refused** — *"Sales Invoice BTAX-… has been approved and issued Tax Invoice Serial …, so it cannot be cancelled. Issue a Credit Note instead: open the invoice and use Create > Return / Credit Note."* This is the new, correct behaviour.
-4. Reverse each invoice with a Credit Note exactly as in **3.7 B** (ceo@ creates and sends, office@ approves). Untick **Update Outstanding for Self** before saving, so the Credit Note clears the original invoice's balance. **Expected:** the original invoice shows status **Credit Note Issued**, Outstanding **0**, and keeps its number and Tax Invoice Serial.
+4. Reverse each invoice with a Credit Note exactly as in **3.7 B** (ceo@ creates and sends, office@ approves), then **apply it to the invoice with Payment Reconciliation (3.7 C)**. **Expected:** after the reconciliation the original invoice shows Outstanding **0** and status **Credit Note Issued**, and keeps its number and Tax Invoice Serial. (Before the reconciliation it still shows its full outstanding — that is normal on production's ERPNext.)
 5. **Commission:** once the full Credit Note is approved, the original invoice's commission entries that weren't paid show **Status Cancelled, Commission Amount 0**; a Paid entry stays Paid and gets a **Deduction** entry (see 2.9). No entries appear under the Credit Note's own number (`/app/sales-commission-entry?sales_invoice=BTAX-RET-…` is empty).
 6. What remains forever: the approved invoices (and their tax serial numbers), the approved Credit Notes (`BTAX-RET-…`), the cancelled payment, the commission entries, and the ledger entries.
 
@@ -460,16 +461,23 @@ Use a **Purchase Order** (no ledger impact even if something goes wrong). Expect
 
 **B. Issue a Credit Note — [PERMANENT]**
 4. As **ceo@**: open the approved invoice → **Create → Return / Credit Note**. A new Sales Invoice opens with **Is Return** ticked, **Return Against** = the original, negative quantities.
-5. **Before saving:** to apply the Credit Note straight against the original invoice's balance, untick **Update Outstanding for Self**. (Ticked = the Credit Note stands as its own negative balance on the customer, to be allocated or refunded later.) For a partial return, reduce the quantities now.
+5. **Before saving:** for a partial return, reduce the quantities now. (Production's ERPNext has no "Update Outstanding for Self" option — if a newer version shows it, leave it **ticked** so these steps apply unchanged.)
 6. **Save.** **Expected:** name in the **credit-note series** — `BTAX-RET-0000x` for Blueline (`TAX-RET-…` for `TAX-` invoices, `SVAT-RET_…` for `SVAT-` invoices). It must **not** take a `BTAX-0000x` number. Workflow State **Draft**. (K3: the form may be read-only after saving.)
 7. Still as ceo@: **Actions → Send for Approval** → **Pending Approval**. Then **Actions → Approve** → **Expected:** refused (self-approval).
 8. As **office@**: **Actions → Approve**. **Expected:** Credit Note **Approved / Submitted**, status **Return**; the **Tax Invoice Serial** field on the Credit Note is **empty** (Credit Notes don't take a tax-invoice serial).
-9. Check the **original invoice**: same number, same **Tax Invoice Serial**, still **Approved / Submitted**. If you unticked "Update Outstanding for Self": Outstanding **0** and status **Credit Note Issued**.
+9. Check the **original invoice**: same number, same **Tax Invoice Serial**, still **Approved / Submitted**, and its **Outstanding is unchanged** for now. The Credit Note shows a **negative** Outstanding (e.g. −100.00): the credit sits on the customer until it is applied (C below).
 10. **Ledger:** on the Credit Note → **View → Accounting Ledger**. **Expected:** the reverse of the invoice — Debit Sales (and VAT, if any), Credit the customer's receivable, same amounts.
 11. **Numbering:** create and approve the next ordinary invoice (if one is due anyway) → **Expected:** it takes the next `BTAX-` number right after the last ordinary invoice — no gap, nothing skipped for the Credit Note.
 12. **Commission:** see 2.8 step 5 and 2.9. **Cancelling the Credit Note (K12):** possible; it restores the commission (2.9 E).
 
-**Wrong results:** the Cancel in A goes through; the Credit Note gets a `BTAX-0000x` number or a Tax Invoice Serial; the original's number/serial changes; the creator can approve the Credit Note.
+**C. Apply the Credit Note to the invoice (Payment Reconciliation) — as the accountant — [PERMANENT]**
+13. Go to **/app/payment-reconciliation** (Accounting → Payment Reconciliation). Fill **Company**, **Party Type** `Customer`, **Party** (the invoice's customer), **Receivable / Payable Account** (the invoice's *Debit To*, e.g. `Trade Receivable - BEPL`). Click **Get Unreconciled Entries**.
+14. In **Payments**, tick the row for your Credit Note (Reference Type *Sales Invoice*, `BTAX-RET-…`). In **Invoices**, tick the original invoice. Click **Allocate**, check the **Allocated Amount** (the Credit Note's amount, or the invoice's outstanding if that is smaller), then click **Reconcile**.
+15. **Expected:** the original invoice's Outstanding drops by the credited amount; the Credit Note's Outstanding becomes **0**. If that brings the invoice to **0**, its status is **Credit Note Issued**. (Behind the scenes ERPNext posts a Journal Entry of type *Credit Note*; it only moves the balance between the two documents.)
+16. **Commission release:** if the invoice's Outstanding is now 0 (whatever got it there — a payment, this reconciliation, or both, in either order), its *Accrued* commission entries move to **Payment Received - Pending Approval** at that moment. While anything is still outstanding they stay Accrued. A fully returned invoice has nothing to release (its commission was cancelled in 2.9 B).
+17. **If the customer has already paid in full:** don't reconcile against the invoice; the credit stays on the customer's account to be used on a later invoice (same screen, tick the later invoice) or refunded (Payment Entry, type *Pay*, against the Credit Note).
+
+**Wrong results:** the Cancel in A goes through; the Credit Note gets a `BTAX-0000x` number or a Tax Invoice Serial; the original's number/serial changes; the creator can approve the Credit Note; after C the invoice is settled but its commission is still Accrued.
 
 ### 3.8 Changing approver roles — [REVERSIBLE: make a change, check it, change it back]
 
@@ -635,6 +643,7 @@ Tick **P** (pass), **F** (fail), or **K** (known issue from 0.5).
 | 3.6 | **New:** creator (System Manager) and sender both refused on Approve; a third user is offered Approve | ☐ | ☐ | ☐ (K10) |
 | 3.7A | **New:** Cancel refused on an approved invoice, message points to Credit Note; drafts still deletable | ☐ | ☐ | |
 | 3.7B | **New:** Credit Note numbered `BTAX-RET-…`, no tax serial, goes through Send for Approval → Approve (creator refused), reverses the ledger; original keeps number/serial | ☐ | ☐ | ☐ (K3/K12) |
+| 3.7C | **New:** Credit Note applied with Payment Reconciliation → invoice outstanding drops (Credit Note Issued at 0); commission released only when nothing is left to pay, payment and reconciliation in either order | ☐ | ☐ | |
 | 3.8 | **New:** only System Manager can edit a workflow; an added approver role works, its holder still can't self-approve; change is in the version history and survives an update; removal takes effect | ☐ | ☐ | |
 | 4.1 | Petty Cash validation messages | ☐ | ☐ | |
 | 4.2 | Petty Cash → Pending Approval + notification; direct Submit refused on own voucher | ☐ | ☐ | ☐ (K5) |

@@ -58,6 +58,10 @@ def create_commission_entries(doc, method=None):
 	"""
 	if doc.get("is_return"):
 		apply_credit_note(doc)
+		# Applied straight against the original (newer ERPNext's "Update Outstanding for
+		# Self" unticked), the Credit Note may itself settle what was left to pay.
+		if doc.return_against:
+			release_if_settled(doc.return_against)
 		return
 
 	for item in doc.items:
@@ -192,25 +196,54 @@ def _calculate_commission(rule, item):
 
 
 def release_commission_entries(doc, method=None):
-	"""Payment Entry `on_submit` and `on_update_after_submit`: once a referenced Sales
-	Invoice's outstanding_amount reaches 0, move its Accrued commission entries to
-	"Payment Received - Pending Approval". Registered on both events because
-	Payment Reconciliation can update an already-submitted Payment Entry's references
-	without re-firing on_submit.
+	"""Payment Entry `on_submit` and `on_update_after_submit`: check every Sales Invoice it
+	references (see release_if_settled). Registered on both events because Payment
+	Reconciliation can update an already-submitted Payment Entry's references without
+	re-firing on_submit.
 	"""
-	invoice_names = {
+	for invoice_name in {
 		row.reference_name
 		for row in (doc.references or [])
 		if row.reference_doctype == "Sales Invoice" and row.reference_name
-	}
-	if not invoice_names:
-		return
+	}:
+		release_if_settled(invoice_name)
 
-	for invoice_name in invoice_names:
-		outstanding = frappe.db.get_value("Sales Invoice", invoice_name, "outstanding_amount")
-		if outstanding is None or flt(outstanding) > 0:
-			continue
-		_release_entries_for_invoice(invoice_name)
+
+def release_on_journal_entry(doc, method=None):
+	"""Journal Entry `on_submit`: a receipt, a write-off, or the Journal Entry Payment
+	Reconciliation creates to apply a Credit Note to an invoice."""
+	for invoice_name in {
+		row.reference_name
+		for row in (doc.accounts or [])
+		if row.reference_type == "Sales Invoice" and row.reference_name
+	}:
+		release_if_settled(invoice_name)
+
+
+def release_on_ledger_update(doc, method=None):
+	"""Payment Ledger Entry `on_update`: ERPNext recalculates the invoice's outstanding in
+	this entry's own on_update (which runs before this hook) whenever the entry is flagged
+	to, whatever document made it — so this catches routes no document hook sees."""
+	if doc.against_voucher_type == "Sales Invoice" and doc.against_voucher_no and not doc.delinked:
+		release_if_settled(doc.against_voucher_no)
+
+
+def release_if_settled(invoice_name):
+	"""Once a Sales Invoice's outstanding amount has reached zero — by a Payment Entry, a
+	Journal Entry, a Credit Note applied or reconciled against it, or any mix — move its
+	Accrued commission entries to "Payment Received - Pending Approval", where the
+	two-person approval starts. Never while anything is still outstanding. Only Accrued
+	entries move, so calling this again (several hooks fire for one payment) changes
+	nothing: an entry is released once.
+	"""
+	invoice = frappe.db.get_value(
+		"Sales Invoice", invoice_name, ["docstatus", "is_return", "outstanding_amount"], as_dict=True
+	)
+	if not invoice or invoice.docstatus != 1 or invoice.is_return:
+		return
+	if flt(invoice.outstanding_amount, 2) > 0:
+		return
+	_release_entries_for_invoice(invoice_name)
 
 
 def _release_entries_for_invoice(invoice_name):

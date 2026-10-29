@@ -221,9 +221,12 @@ Notes for the editor are marked **[Editor]** and are not part of the manual.
 > 1. Open the approved Sales Invoice.
 > 2. Click **Create → Return / Credit Note**. A new Credit Note opens with the invoice's lines, shown as negative quantities.
 > 3. For a partial return, reduce the quantities to what is actually being credited. Remove any lines that aren't being credited.
-> 4. To set the Credit Note straight against this invoice's unpaid balance, untick **Update Outstanding for Self** before saving. Leave it ticked if the customer has already paid and the credit should be held on their account or refunded.
-> 5. Click **Save**. The Credit Note takes a number like `BTAX-RET-00001` — not a Tax Invoice number.
-> 6. Click **Actions → Send for Approval**.
-> 7. Another approver opens it and clicks **Actions → Approve**. You can't approve your own Credit Note.
-> 8. Once approved, the sale is reversed in the accounts. The original invoice keeps its number and Tax Invoice serial. If you unticked "Update Outstanding for Self", its status shows **Credit Note Issued**.
-> 9. The sales commission on the invoice is adjusted automatically (see 3.2a). Commission already paid shows up as a deduction on the Sales Commission Register.
+> 4. Click **Save**. The Credit Note takes a number like `BTAX-RET-00001` — not a Tax Invoice number.
+> 5. Click **Actions → Send for Approval**.
+> 6. Another approver opens it and clicks **Actions → Approve**. You can't approve your own Credit Note.
+> 7. Once approved, the sale is reversed in the accounts. The original invoice keeps its number and Tax Invoice serial. The credit now sits on the customer's account: the Credit Note shows a negative outstanding amount, and the invoice still shows what it showed before.
+> 8. **Apply the credit to the invoice** (the accountant): open **Payment Reconciliation**. Choose the **Company**, **Party Type** *Customer*, the **Party**, and the customer's **Receivable / Payable Account**, then click **Get Unreconciled Entries**. Tick the Credit Note in the **Payments** table and the invoice in the **Invoices** table, click **Allocate**, check the amount, and click **Reconcile**. The invoice's outstanding drops by the credit; if nothing is left to pay, its status shows **Credit Note Issued**.
+>    If the customer has already paid in full, don't apply it to that invoice: leave the credit on their account for a later invoice (same screen) or refund it with a Payment Entry.
+> 9. The sales commission on the invoice is adjusted automatically when the Credit Note is approved (see 3.2a). Commission already paid shows up as a deduction on the Sales Commission Register. Commission on the rest of the invoice becomes ready for approval as soon as nothing is left to pay — whether that happens through a payment, this reconciliation, or both, in any order.
+>
+> **[Editor]** Production's ERPNext has no "Update Outstanding for Self" option on a Credit Note, so these steps always use Payment Reconciliation. If ERPNext is upgraded and the option appears, keep it ticked and these steps still apply.

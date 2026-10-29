@@ -147,6 +147,10 @@ class TestCreditNote(BluelineTestCase):
 		self.assertEqual(receivable_balance(invoice.name, credit_note.name), 0)
 
 	def test_credit_note_applied_against_the_original_clears_its_outstanding(self):
+		if not frappe.get_meta("Sales Invoice").get_field("update_outstanding_for_self"):
+			# Production's ERPNext (15.6) has no such option: a Credit Note always stands on its
+			# own and is applied with Payment Reconciliation (test_commission_release).
+			self.skipTest("this ERPNext has no 'Update Outstanding for Self'")
 		invoice = approved_invoice()
 		approved_credit_note(invoice, update_outstanding_for_self=0)
 		invoice = reload(invoice)
