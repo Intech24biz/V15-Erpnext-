@@ -41,6 +41,7 @@
   "adjustments",
   "approval_section",
   "status",
+  "unpaid_warning",
   "column_break_appr1",
   "approved_by_management",
   "management_approved_by",
@@ -294,6 +295,17 @@
    "read_only": 1
   },
   {
+   "allow_on_submit": 1,
+   "bold": 1,
+   "depends_on": "eval:doc.unpaid_warning",
+   "description": "Written by the system when a payment on the invoice was undone after this entry was ticked or approved. Cleared once the invoice is fully paid or credited again.",
+   "fieldname": "unpaid_warning",
+   "fieldtype": "Small Text",
+   "label": "Payment Warning",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
    "fieldname": "column_break_appr1",
    "fieldtype": "Column Break"
   },
@@ -341,7 +353,7 @@
  "index_web_pages_for_search": 0,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-10-29 00:00:00.000000",
+ "modified": "2026-10-29 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Blueline",
  "name": "Sales Commission Entry",

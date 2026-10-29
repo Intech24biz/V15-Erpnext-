@@ -12,6 +12,11 @@ Added from branch `feature/credit-note-commission-approval-roles` (update the ma
 4. a Credit Note adjusts the sales commission on the invoice automatically (new 3.2a);
 5. a System Manager changes who can approve in the Workflow screen, and the change is kept (new 5.4).
 
+Added on `release/client-review-1`:
+
+6. Credit Notes are applied to the invoice with Payment Reconciliation (9.10, rewritten);
+7. commission can only be approved once its invoice is fully paid or credited (3.3, new paragraphs).
+
 Each block below says exactly which part of the manual it replaces or adds to. Text in quotes is the **current** wording, for locating it. Everything under "New text" is ready to paste. Update the manual only once the branch is deployed to production.
 
 Notes for the editor are marked **[Editor]** and are not part of the manual.
@@ -95,6 +100,10 @@ Notes for the editor are marked **[Editor]** and are not part of the manual.
 > Once the second box is ticked by the second person, the entry becomes Approved immediately. There is no separate "Approve" button to click afterwards.
 >
 > **Ticks are locked once approved.** When an entry is Approved, or later Paid, neither box can be unticked or re-ticked by anyone. While the entry is still pending, a box can be unticked, for example if it was ticked by mistake. Its "Approval By" name is then cleared.
+>
+> **Only once the invoice is paid.** Nobody — whatever their role — can tick either box or approve a commission entry while its invoice still has anything left to pay. The system checks the invoice at that moment and refuses with: *"This commission cannot be approved while the invoice still has an outstanding amount. Wait until the invoice is fully paid or credited."* An invoice counts as paid when nothing is left outstanding, whether through payments, a Credit Note applied to it (Payment Reconciliation, 9.10), or both.
+>
+> **If a payment is cancelled later.** When the invoice owes money again, entries that nobody had ticked yet go back to **Accrued** and become ready again automatically once the invoice is fully paid. Entries that were already ticked, Approved or Paid keep their status; they show a red **Payment Warning** at the top, and a note in their history, so the accountant can check them before any commission is paid. The warning disappears when the invoice is fully paid again. Deduction entries (3.2a) are not affected by these rules.
 
 ---
 
@@ -194,6 +203,8 @@ Notes for the editor are marked **[Editor]** and are not part of the manual.
 | Question | Answer |
 |---|---|
 | I clicked Approve and got "You cannot approve a document you created or sent for approval." Why? | You created this document or sent it for approval, so someone else has to approve it. This is deliberate and applies to every role. |
+| I tried to approve a commission entry and got "This commission cannot be approved while the invoice still has an outstanding amount." | The customer hasn't paid the invoice in full yet (or a payment was cancelled). Approve it once the invoice shows nothing outstanding — after the remaining payment, or after a Credit Note is applied to it. |
+| A commission entry shows a red Payment Warning. What do I do? | A payment on its invoice was cancelled after the entry was ticked or approved. Don't pay that commission until the invoice is fully paid again; the warning then disappears by itself. |
 | A customer returned goods after the commission was paid. Do I have to fix the commission? | No. Approving the Credit Note creates a Deduction entry for that person automatically. It is listed under Outstanding Deductions on the Sales Commission Register; take it off their next payout. |
 
 ---

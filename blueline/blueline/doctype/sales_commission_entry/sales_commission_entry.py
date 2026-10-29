@@ -1,7 +1,8 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import cint, cstr
+from frappe.model.meta import get_field_precision
+from frappe.utils import cint, cstr, flt
 
 PENDING_APPROVAL_STATUS = "Payment Received - Pending Approval"
 APPROVED_STATUS = "Approved"
@@ -11,6 +12,15 @@ CANCELLED_STATUS = "Cancelled"
 # Set on doc.flags only by sales_commission.py's Credit Note path. `flags` is a reserved key
 # that Frappe never fills from a client payload, so a user request cannot carry it.
 CREDIT_NOTE_ADJUSTMENT_FLAG = "credit_note_adjustment"
+# Same, for sales_commission.py moving an entry back (or flagging it) after a payment was undone.
+PAYMENT_UNDONE_FLAG = "payment_undone"
+SYSTEM_FLAGS = (CREDIT_NOTE_ADJUSTMENT_FLAG, PAYMENT_UNDONE_FLAG)
+
+DEDUCTION_TYPE = "Deduction"
+UNPAID_MESSAGE = (
+	"This commission cannot be approved while the invoice still has an outstanding amount. "
+	"Wait until the invoice is fully paid or credited."
+)
 
 # Once an entry reaches one of these, its approval ticks are history and can't change.
 LOCKED_STATUSES = (APPROVED_STATUS, PAID_STATUS, CANCELLED_STATUS)
@@ -20,6 +30,20 @@ APPROVAL_TICKS = {
 	"approved_by_management": "management_approved_by",
 	"approved_by_technical": "technical_approved_by",
 }
+
+
+def invoice_outstanding(sales_invoice):
+	"""The invoice's outstanding amount right now: read straight from the database (not the
+	document cache), rounded to the currency's precision. A missing invoice counts as unpaid."""
+	row = frappe.db.sql(
+		"select outstanding_amount, currency from `tabSales Invoice` where name = %s",
+		sales_invoice,
+		as_dict=True,
+	)
+	if not row:
+		return float("inf")
+	df = frappe.get_meta("Sales Invoice").get_field("outstanding_amount")
+	return flt(row[0].outstanding_amount, get_field_precision(df, currency=row[0].currency))
 
 
 class SalesCommissionEntry(Document):
@@ -62,12 +86,18 @@ class SalesCommissionEntry(Document):
 		# create one by hand; the same approval rules apply to a draft.
 		if self.original_commission_amount is None:
 			self.original_commission_amount = self.commission_amount
+		self.keep_system_warning()
 		self.apply_approval_rules()
+		self.refuse_approval_while_unpaid()
+
+	def is_system_change(self):
+		return any(self.flags.get(flag) for flag in SYSTEM_FLAGS)
 
 	def validate_workflow(self):
-		# A Credit Note can cancel an entry from any state, or restore it, which the
-		# commission workflow has no transition for. Only that system path skips it.
-		if self.flags.get(CREDIT_NOTE_ADJUSTMENT_FLAG):
+		# A Credit Note can cancel an entry from any state, or restore it, and an undone
+		# payment moves it back to Accrued; the commission workflow has no transition for
+		# either. Only those system paths skip it.
+		if self.is_system_change():
 			return
 		super().validate_workflow()
 
@@ -75,12 +105,36 @@ class SalesCommissionEntry(Document):
 		# Ticking either approval checkbox re-saves an already-submitted entry, which
 		# takes this path (not validate()) — see sales_commission.py for why.
 		self.refuse_manual_cancellation()
+		self.keep_system_warning()
 		self.apply_approval_rules()
-		if self.flags.get(CREDIT_NOTE_ADJUSTMENT_FLAG):
-			# Cancelling or restoring for a Credit Note never grants an approval.
+		if self.is_system_change():
+			# Cancelling or restoring for a Credit Note, or moving back after an undone
+			# payment, never grants an approval.
 			return
 		self.auto_promote_to_approved()
+		self.refuse_approval_while_unpaid()
 		self.require_both_approvals()
+
+	def keep_system_warning(self):
+		# Payment Warning is written only by the system (sales_commission.reopen_if_unsettled).
+		if self.is_system_change():
+			return
+		before = self.get_doc_before_save()
+		self.unpaid_warning = before.unpaid_warning if before else None
+
+	def refuse_approval_while_unpaid(self):
+		# Holds for every user and role, Administrator and System Manager included, and for
+		# every route: either tick, the Approve action, or any save that sets Approved.
+		# Deductions are a Credit Note's own flow and are approved regardless.
+		if self.entry_type == DEDUCTION_TYPE:
+			return
+		before = self.get_doc_before_save()
+		newly_ticked = any(cint(self.get(tick)) and not (before and cint(before.get(tick))) for tick in APPROVAL_TICKS)
+		becoming_approved = self.status == APPROVED_STATUS and not (before and before.status == APPROVED_STATUS)
+		if not (newly_ticked or becoming_approved):
+			return
+		if invoice_outstanding(self.sales_invoice) > 0:
+			frappe.throw(_(UNPAID_MESSAGE), title=_("Invoice Not Fully Paid"))
 
 	def refuse_manual_cancellation(self):
 		# Commission Amount and the Adjustments table are locked after submit by Frappe

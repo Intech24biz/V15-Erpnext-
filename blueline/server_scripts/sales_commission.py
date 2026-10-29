@@ -4,6 +4,8 @@ from frappe.utils import flt, fmt_money, now_datetime
 
 from blueline.blueline.doctype.sales_commission_entry.sales_commission_entry import (
 	CREDIT_NOTE_ADJUSTMENT_FLAG,
+	PAYMENT_UNDONE_FLAG,
+	invoice_outstanding,
 )
 
 RULE_DOCTYPE = "Sales Commission Rule"
@@ -241,9 +243,10 @@ def release_if_settled(invoice_name):
 	)
 	if not invoice or invoice.docstatus != 1 or invoice.is_return:
 		return
-	if flt(invoice.outstanding_amount, 2) > 0:
+	if invoice_outstanding(invoice_name) > 0:
 		return
 	_release_entries_for_invoice(invoice_name)
+	_clear_unpaid_warnings(invoice_name)
 
 
 def _release_entries_for_invoice(invoice_name):
@@ -268,6 +271,98 @@ def _release_entries_for_invoice(invoice_name):
 				title=f"Sales Commission release failed: {entry_name}",
 				message=frappe.get_traceback(),
 			)
+
+
+def reopen_on_payment_cancel(doc, method=None):
+	"""Payment Entry `on_cancel`."""
+	for invoice_name in {
+		row.reference_name
+		for row in (doc.references or [])
+		if row.reference_doctype == "Sales Invoice" and row.reference_name
+	}:
+		reopen_if_unsettled(invoice_name, _("Payment Entry {0} was cancelled").format(doc.name))
+
+
+def reopen_on_journal_cancel(doc, method=None):
+	"""Journal Entry `on_cancel` (including the Journal Entry that applied a Credit Note)."""
+	for invoice_name in {
+		row.reference_name
+		for row in (doc.accounts or [])
+		if row.reference_type == "Sales Invoice" and row.reference_name
+	}:
+		reopen_if_unsettled(invoice_name, _("Journal Entry {0} was cancelled").format(doc.name))
+
+
+def reopen_on_unreconcile(doc, method=None):
+	"""Unreconcile Payment `on_submit`: a payment or credit taken back off the invoice."""
+	for invoice_name in {
+		row.reference_name
+		for row in (doc.allocations or [])
+		if row.reference_doctype == "Sales Invoice" and row.reference_name
+	}:
+		reopen_if_unsettled(
+			invoice_name, _("{0} {1} was unreconciled from the invoice").format(_(doc.voucher_type), doc.voucher_no)
+		)
+
+
+def reopen_if_unsettled(invoice_name, reason):
+	"""After a payment, credit or reconciliation is undone: if the invoice has an outstanding
+	amount again, its released commission is no longer payable.
+
+	- Payment Received - Pending Approval with neither box ticked: nothing has been decided
+	  yet, so it goes back to Accrued, and release_if_settled releases it again once the
+	  invoice is fully paid or credited.
+	- Anything further along (a tick given, Approved, Paid): a person has already acted on
+	  it, so its status is not changed. It gets a Payment Warning, shown on the form, and a
+	  timeline comment; the approval guard stops any further tick or approval meanwhile.
+	"""
+	outstanding = invoice_outstanding(invoice_name)
+	if outstanding <= 0:
+		return
+	amount = fmt_money(
+		outstanding, currency=frappe.db.get_value("Sales Invoice", invoice_name, "currency")
+	)
+	entry_names = frappe.get_all(
+		ENTRY_DOCTYPE,
+		filters={
+			"sales_invoice": invoice_name,
+			"entry_type": COMMISSION_TYPE,
+			"docstatus": 1,
+			"status": ["in", [PENDING_APPROVAL_STATUS, APPROVED_STATUS, PAID_STATUS]],
+		},
+		pluck="name",
+		order_by="name asc",
+	)
+	for entry_name in entry_names:
+		entry = frappe.get_doc(ENTRY_DOCTYPE, entry_name)
+		ticked = entry.approved_by_management or entry.approved_by_technical
+		if entry.status == PENDING_APPROVAL_STATUS and not ticked:
+			entry.status = ACCRUED_STATUS
+			comment = _(
+				"Moved back to Accrued: {0}, and invoice {1} has {2} outstanding again. "
+				"It will be released again once the invoice is fully paid or credited."
+			).format(reason, invoice_name, amount)
+		else:
+			state = _("already {0}").format(_(entry.status)) if entry.status != PENDING_APPROVAL_STATUS else _("already ticked")
+			entry.unpaid_warning = _(
+				"{0}, and invoice {1} has {2} outstanding again. This entry is {3}, so its status "
+				"was not changed. Check it before any commission is paid."
+			).format(reason, invoice_name, amount, state)
+			comment = entry.unpaid_warning
+		_save_system_change(entry, PAYMENT_UNDONE_FLAG, comment)
+
+
+def _clear_unpaid_warnings(invoice_name):
+	for entry_name in frappe.get_all(
+		ENTRY_DOCTYPE,
+		filters={"sales_invoice": invoice_name, "unpaid_warning": ["is", "set"], "docstatus": 1},
+		pluck="name",
+	):
+		entry = frappe.get_doc(ENTRY_DOCTYPE, entry_name)
+		entry.unpaid_warning = None
+		_save_system_change(
+			entry, PAYMENT_UNDONE_FLAG, _("Invoice {0} is fully paid or credited again: Payment Warning cleared.").format(invoice_name)
+		)
 
 
 def guard_commission_entries_on_cancel(doc, method=None):
@@ -549,6 +644,10 @@ def reverse_credit_note(doc, method=None):
 	# design (they are its audit trail), which Frappe would otherwise treat as blocking.
 	doc.ignore_linked_doctypes = (*(doc.get("ignore_linked_doctypes") or ()), ENTRY_DOCTYPE)
 
+	# Cancelling a Credit Note that settled the invoice can leave it unpaid again.
+	if doc.return_against:
+		reopen_if_unsettled(doc.return_against, _("Credit Note {0} was cancelled").format(doc.name))
+
 
 def _reverse_entry(entry, credit_note):
 	precision = entry.precision("commission_amount")
@@ -586,6 +685,15 @@ def _cancel_deduction(deduction_name, credit_note):
 	deduction.add_comment(
 		"Info", _("Cancelled automatically: Credit Note {0} was cancelled.").format(credit_note.name)
 	)
+
+
+def _save_system_change(entry, flag, comment):
+	"""A status / Payment Warning change made by the system after an undone payment. The
+	commission workflow has no transition back to Accrued, so only this save skips it."""
+	entry.flags.ignore_permissions = True
+	entry.flags[flag] = True
+	entry.save(ignore_version=False)
+	entry.add_comment("Info", comment)
 
 
 def _save_credit_note_change(entry, comment):

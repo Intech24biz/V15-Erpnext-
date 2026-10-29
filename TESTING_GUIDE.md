@@ -13,6 +13,7 @@
 > **Updated 2026-10-29 (branch `feature/credit-note-commission-approval-roles`, not deployed):**
 > - **Credit Notes now adjust commission** (K11 resolved). Approving a Credit Note reduces the original invoice's unpaid commission entries in proportion to what was returned (a full return cancels them), and creates a negative **Deduction** entry for commission that was already paid. Cancelling the Credit Note undoes all of it. No ledger entries are involved. New section **2.9**; changed **2.8** step 5 and **3.7** step 12.
 > - **Credit Notes are applied with Payment Reconciliation** (new **3.7 C**; 2.8 step 4 changed). Production's ERPNext has no "Update Outstanding for Self" option, so a Credit Note always stands on the customer's account until the accountant reconciles it against the invoice. **Commission is now released whenever the invoice's outstanding reaches 0 by any route** — payment, reconciliation, Journal Entry, in any order — and never earlier.
+> - **No commission approval while the invoice is unpaid** (new **2.10**): neither tick, the Approve action, nor any other route to Approved is accepted — for any role — until the invoice's outstanding is 0. If a payment is undone later, untouched entries go back to Accrued; ticked, Approved or Paid ones keep their status and show a **Payment Warning**.
 > - **Deduction entries need the two-person approval** (start in *Payment Received - Pending Approval*), and **a Credit Note whose commission can't be adjusted is refused** with *"Commission could not be adjusted for this Credit Note; nothing was changed. Contact the administrator."* — nothing is half-done. See 2.9 C and H.
 > - **Approver roles are changed in the Workflow screen and stay changed.** Previously every update (bench migrate) silently put the shipped approver roles and notification recipients back. Workflows and pending-approval notifications are now only created if missing, never overwritten; only a System Manager can edit a workflow, and each change is recorded. New section **3.8**.
 
@@ -356,6 +357,27 @@ Use the multi-payee invoice from 2.7 (three entries: 6.00, 130.00, 130.00) and t
 **H. A failed commission adjustment blocks the Credit Note — [not testable in the browser]**
 A failure can't be forced from the screen; it is covered by the automated test (a failure is injected halfway through the adjustment). What a user would see: **Approve** on the Credit Note is refused with *"Commission could not be adjusted for this Credit Note; nothing was changed. Contact the administrator."* The Credit Note stays **Pending Approval** with no ledger entries, no commission entry changes, and an entry appears in **/app/error-log** titled *"Sales Commission credit note adjustment failed: BTAX-RET-…"* (written within about a minute, by the scheduler). If you ever see this message, report it with the Error Log entry.
 
+### 2.10 No approval while the invoice is unpaid — [A: SAFE; B: PERMANENT]
+
+Expected message every time: *"This commission cannot be approved while the invoice still has an outstanding amount. Wait until the invoice is fully paid or credited."* It applies to every role — ceo@ (System Manager) and Administrator included.
+
+**A. Unpaid or partly paid invoice — [SAFE: every attempt is refused]**
+1. Approve an invoice as in 2.2 but **don't pay it** (or pay only part of it, as in 2.3 with a smaller Paid Amount). Its commission entry stays **Accrued**.
+2. As **the accountant**: tick **Approved by Management** → **Update** → **Expected:** the message above; the box is unticked after reload. Same as **office@** with **Approved by Technical**, and as **ceo@** with either box.
+3. As **ceo@**: change **Status** to *Approved* (if the field is editable for you) → **Update** → **Expected:** the same message.
+4. **Wrong results:** any tick is saved, or the entry becomes Approved.
+
+**B. Undone payment after release — [PERMANENT]**
+5. Pay the invoice in full (2.3) → the entries go to **Payment Received - Pending Approval**. As the accountant tick **Approved by Management** on **one** entry only.
+6. As **ceo@**: **Cancel** the Payment Entry.
+7. **Expected:**
+   - the entries **nobody had ticked** go back to **Accrued**, with a timeline comment *"Moved back to Accrued: Payment Entry … was cancelled, and invoice … has … outstanding again…"*;
+   - the **ticked** entry keeps its status and tick, shows a red **Payment Warning** at the top of the form (*"…This entry is already ticked, so its status was not changed. Check it before any commission is paid."*), and the same text in its timeline; office@ can't tick the second box (message above). An entry that was already **Approved** or **Paid** is treated the same way: status unchanged, warning shown.
+8. Pay the invoice in full again. **Expected:** the Accrued entries are released again; the Payment Warning disappears; the second approval can now be given.
+9. **Wrong results:** a ticked/Approved entry changes status; an untouched entry stays in Pending Approval while the invoice owes money; the warning stays after the invoice is paid again.
+
+**C. Settled by a Credit Note** — after 3.7 C brings the invoice to 0 through reconciliation (with or without a payment), approval works normally. **Deduction entries** (2.9 C) are not affected by this rule: they can be approved even if the original invoice owes money again.
+
 ---
 
 ## SECTION 3 — Approval workflows (Quotation, Purchase Order, Sales Invoice, Payment Entry)
@@ -634,6 +656,7 @@ Tick **P** (pass), **F** (fail), or **K** (known issue from 0.5).
 | 2.6 | Mark as Paid by the accountant → Paid (first production confirmation); ticks still locked | ☐ | ☐ | |
 | 2.7 | Multi-payee invoice → 3 entries with correct credited-to and amounts | ☐ | ☐ | |
 | 2.8 | Cleanup: invoice Cancel refused; reversed by Credit Note; unpaid commission Cancelled, none under the Credit Note | ☐ | ☐ | |
+| 2.10 | **New:** no tick / Approve / Approved while the invoice owes money (any role); undone payment → untouched entries back to Accrued, ticked/Approved ones keep status with a Payment Warning, cleared when paid again | ☐ | ☐ | |
 | 2.9 | **New:** Credit Note reduces unpaid commission in proportion / cancels on full return; paid → Deduction entry (Pending Approval, two different approvers, can't be marked Paid); register shows outstanding deductions, approved ones included; cancelling the Credit Note restores all; status lock holds; no ledger posting | ☐ | ☐ | ☐ (K12/K13) |
 | 3.1 | Quotation: no Submit; Send for Approval → Approve submits; SD2 unchanged; office@ refused approving own quotation | ☐ | ☐ | ☐ (K3/K10) |
 | 3.2 | Purchase Order: no Submit; Send for Approval; Approve offered | ☐ | ☐ | |

@@ -110,10 +110,16 @@ doc_events = {
         # Payment Reconciliation can update an already-submitted Payment Entry's
         # references without re-firing on_submit; this catches that path too.
         "on_update_after_submit": "blueline.server_scripts.sales_commission.release_commission_entries",
+        # An undone payment can leave the invoice unpaid again (see reopen_if_unsettled).
+        "on_cancel": "blueline.server_scripts.sales_commission.reopen_on_payment_cancel",
     },
     # Commission is released when an invoice's outstanding reaches zero by any route.
     "Journal Entry": {
         "on_submit": "blueline.server_scripts.sales_commission.release_on_journal_entry",
+        "on_cancel": "blueline.server_scripts.sales_commission.reopen_on_journal_cancel",
+    },
+    "Unreconcile Payment": {
+        "on_submit": "blueline.server_scripts.sales_commission.reopen_on_unreconcile",
     },
     "Payment Ledger Entry": {
         "on_update": "blueline.server_scripts.sales_commission.release_on_ledger_update",
