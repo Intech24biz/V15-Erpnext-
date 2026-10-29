@@ -117,9 +117,7 @@ blueline.VatDashboard = class VatDashboard {
 					</label>
 				</div>
 				<div class="row vatd-cards"></div>
-				<div class="vatd-cards-note">
-					${__("Cards regroup wrong-direction balances; the monthly table shows raw figures.")}
-				</div>
+				<div class="vatd-cards-note">${VatDashboard.cards_note(false)}</div>
 				<div class="row vatd-charts">
 					<div class="col-md-12">
 						<div class="vatd-chart-title">${__("Monthly Output vs Input vs Net VAT")}</div>
@@ -142,12 +140,21 @@ blueline.VatDashboard = class VatDashboard {
 			this.show_raw = e.target.checked;
 			if (this.data) {
 				this.render_cards(this.get_card_summary(this.data));
+			} else {
+				this.body.find(".vatd-cards-note").text(VatDashboard.cards_note(this.show_raw));
 			}
 		});
 	}
 
 	get_card_summary(data) {
 		return this.show_raw ? data.raw_summary : data.summary;
+	}
+
+	// The line under the cards says which figures they show.
+	static cards_note(show_raw) {
+		return show_raw
+			? __("Showing raw ledger totals; no regrouping applied.")
+			: __("Cards regroup wrong-direction balances; the monthly table shows raw figures.");
 	}
 
 	refresh() {
@@ -204,6 +211,7 @@ blueline.VatDashboard = class VatDashboard {
 				</div>
 			`).appendTo($cards);
 		});
+		this.body.find(".vatd-cards-note").text(VatDashboard.cards_note(this.show_raw));
 	}
 
 	render_monthly_chart(rows) {

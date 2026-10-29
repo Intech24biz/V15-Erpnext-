@@ -174,6 +174,18 @@ Notes for the editor are marked **[Editor]** and are not part of the manual.
 
 ---
 
+## VAT Dashboard section (from `feature/vat-raw-ledger-totals` and `feature/final-items`)
+
+### Add this paragraph after the description of the summary cards
+
+**New text:**
+
+> **Show raw ledger totals.** Above the cards there is a switch, **Show raw ledger totals**. Off (the default), the cards move any output-VAT account with a debit balance into Input, and the line under the cards says *"Cards regroup wrong-direction balances; the monthly table shows raw figures."* On, the cards show each account exactly as posted — Output can then be negative — and the line reads *"Showing raw ledger totals; no regrouping applied."* The Net VAT figure, the chart and the monthly table are the same either way.
+
+**[Editor]** Place this in the VAT Dashboard section of the manual; it describes behaviour shipped on the release branch.
+
+---
+
 ## Section 6 — Petty Cash Vouchers
 
 ### Add this paragraph at the end of 6.1

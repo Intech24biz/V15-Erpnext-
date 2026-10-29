@@ -612,6 +612,12 @@ While logged in, open these URLs in the browser (read-only; they return the dash
   **Expected:** `account_detail` lists GIL VAT accounts **that have postings** (e.g. `Vat Control Account - GIL`). Note: `account_detail` only lists accounts with ledger activity in the range, so `SVAT 18% - GIL`, `VAT 15% - GIL`, `VAT 18% - GIL` appear only if they have postings. (Server-side, all four GIL accounts — SVAT 18%, VAT 15%, VAT 18%, Vat Control Account — were confirmed as detected on 2026-10-08.)
 - **Wrong result:** "Transport - private vehicle expenses - I24" appears for Global Intech.
 
+### 5.5 "Show raw ledger totals" toggle — [SAFE]
+1. With Blueline selected, the toggle **Show raw ledger totals** above the cards is **off**. **Expected** line under the cards: *"Cards regroup wrong-direction balances; the monthly table shows raw figures."*
+2. Tick the toggle. **Expected:** the cards' labels end in *(raw ledger)*, Blueline's Output card shows the posted figure (**−564,871.43** on the 2026-10-08 figures), and the line under the cards reads exactly *"Showing raw ledger totals; no regrouping applied."* The Net card, chart and monthly table don't change.
+3. Untick it. **Expected:** the original cards and the original line come back.
+4. **Wrong results:** the line doesn't change with the toggle; the Net figure differs between on and off.
+
 ---
 
 ## SECTION 6 — Role assignments sanity check — [SAFE, read-only; do NOT click Save on these users]
@@ -675,4 +681,5 @@ Tick **P** (pass), **F** (fail), or **K** (known issue from 0.5).
 | 5.1 | VAT dashboard figures per company match the table above | ☐ | ☐ | |
 | 5.2 | Export to Excel works | ☐ | ☐ | |
 | 5.4 | "Transport - private vehicle expenses - I24" absent for Global Intech | ☐ | ☐ | |
+| 5.5 | **New:** raw-totals toggle; line under the cards reads "Showing raw ledger totals; no regrouping applied." when on, the original wording when off; Net unchanged | ☐ | ☐ | |
 | 6 | Roles: accountant = Financial Manager; ceo@ & office@ = GI Management + Technical Approver; ceo@ has no Role Profile | ☐ | ☐ | |
