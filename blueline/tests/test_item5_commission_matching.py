@@ -124,8 +124,11 @@ class TestCreditedToIsStored(BluelineTestCase):
 
 		from blueline.server_scripts.sales_commission import mark_commission_entry_paid
 
+		from blueline.tests.utils import approved_payout
+
+		payout = approved_payout(entry.commission_amount)
 		frappe.set_user(FINANCIAL_MANAGER)
-		mark_commission_entry_paid(entry.name, payment.name)
+		mark_commission_entry_paid(entry.name, payout.name)
 		frappe.set_user("Administrator")
 		self.assertEqual(credited_to(), GROUP, "changed on pay")
 

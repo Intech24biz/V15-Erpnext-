@@ -112,6 +112,8 @@ doc_events = {
         "on_update_after_submit": "blueline.server_scripts.sales_commission.release_commission_entries",
         # An undone payment can leave the invoice unpaid again (see reopen_if_unsettled).
         "on_cancel": "blueline.server_scripts.sales_commission.reopen_on_payment_cancel",
+        # A payout that Paid commission entries point to can't be cancelled.
+        "before_cancel": "blueline.server_scripts.sales_commission.guard_payout_cancel",
     },
     # Commission is released when an invoice's outstanding reaches zero by any route.
     "Journal Entry": {

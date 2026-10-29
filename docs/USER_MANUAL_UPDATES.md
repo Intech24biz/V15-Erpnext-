@@ -17,6 +17,11 @@ Added on `release/client-review-1`:
 6. Credit Notes are applied to the invoice with Payment Reconciliation (9.10, rewritten);
 7. commission can only be approved once its invoice is fully paid or credited (3.3, new paragraphs).
 
+Added on `feature/final-items`:
+
+8. Mark as Paid links the payout's Payment Entry (new 3.4);
+9. the VAT Dashboard's raw-totals switch explains itself under the cards (VAT Dashboard section).
+
 Each block below says exactly which part of the manual it replaces or adds to. Text in quotes is the **current** wording, for locating it. Everything under "New text" is ready to paste. Update the manual only once the branch is deployed to production.
 
 Notes for the editor are marked **[Editor]** and are not part of the manual.
@@ -104,6 +109,29 @@ Notes for the editor are marked **[Editor]** and are not part of the manual.
 > **Only once the invoice is paid.** Nobody — whatever their role — can tick either box or approve a commission entry while its invoice still has anything left to pay. The system checks the invoice at that moment and refuses with: *"This commission cannot be approved while the invoice still has an outstanding amount. Wait until the invoice is fully paid or credited."* An invoice counts as paid when nothing is left outstanding, whether through payments, a Credit Note applied to it (Payment Reconciliation, 9.10), or both.
 >
 > **If a payment is cancelled later.** When the invoice owes money again, entries that nobody had ticked yet go back to **Accrued** and become ready again automatically once the invoice is fully paid. Entries that were already ticked, Approved or Paid keep their status; they show a red **Payment Warning** at the top, and a note in their history, so the accountant can check them before any commission is paid. The warning disappears when the invoice is fully paid again. Deduction entries (3.2a) are not affected by these rules.
+
+---
+
+## Section 3.4 — Paying commission out (from branch `feature/final-items`)
+
+### Add a new section 3.4 after 3.3 (replaces any text saying Mark as Paid only changes the status)
+
+**New text:**
+
+> **3.4 Paying commission out: Mark as Paid**
+>
+> A commission entry is marked **Paid** only together with the payment that paid it out. First record the payout as usual: a **Payment Entry** of type **Pay** — to the sales person (as an Employee) or, for an outside agent, to their Supplier record — sent for approval and approved by another person.
+>
+> Then, as the Financial Manager, on each **Approved** commission entry the payout covers:
+>
+> 1. In **Payment Entry**, choose the payout. Only submitted Payment Entries of type Pay for the same company are offered.
+> 2. Click **Update**, then **Actions → Mark as Paid**.
+>
+> One payout can cover several commission entries, as long as their commission adds up to no more than the amount the payout paid; the entry that would go over is refused. Once an entry is Paid, its Payment Entry can't be changed by anyone, and the payout can't be cancelled while Paid entries point to it.
+>
+> **Deductions** (3.2a) are never marked Paid: they are taken off a later payout.
+
+**[Editor]** The company needs a Payable account to pay commission from (for example *Commission payable*); the accountant sets this up once.
 
 ---
 
@@ -216,6 +244,7 @@ Notes for the editor are marked **[Editor]** and are not part of the manual.
 |---|---|
 | I clicked Approve and got "You cannot approve a document you created or sent for approval." Why? | You created this document or sent it for approval, so someone else has to approve it. This is deliberate and applies to every role. |
 | I tried to approve a commission entry and got "This commission cannot be approved while the invoice still has an outstanding amount." | The customer hasn't paid the invoice in full yet (or a payment was cancelled). Approve it once the invoice shows nothing outstanding — after the remaining payment, or after a Credit Note is applied to it. |
+| Mark as Paid says "Select the Payment Entry that paid this commission out". | Record the payout first (Payment Entry, type Pay, approved), choose it in the entry's **Payment Entry** field, click **Update**, then Mark as Paid. |
 | A commission entry shows a red Payment Warning. What do I do? | A payment on its invoice was cancelled after the entry was ticked or approved. Don't pay that commission until the invoice is fully paid again; the warning then disappears by itself. |
 | A customer returned goods after the commission was paid. Do I have to fix the commission? | No. Approving the Credit Note creates a Deduction entry for that person automatically. It is listed under Outstanding Deductions on the Sales Commission Register; take it off their next payout. |
 

@@ -15,6 +15,7 @@ from blueline.tests.utils import (
 	BluelineTestCase,
 	act,
 	approved_invoice,
+	approved_payout,
 	as_user,
 	commission_entries,
 	update_entry,
@@ -185,11 +186,11 @@ class TestUndonePayment(BluelineTestCase):
 class TestDeductionsNotBlocked(BluelineTestCase):
 	def test_deduction_is_approved_while_the_original_invoice_is_unpaid_again(self):
 		invoice = approved_invoice()
-		first = pay(invoice, 1000)
+		pay(invoice, 1000)
 		second = pay(invoice, 1000)
 		paid = by_person(invoice)["W.B.Prasanna"]
 		approve(paid)
-		act(FINANCIAL_MANAGER, mark_commission_entry_paid, paid, first.name)
+		act(FINANCIAL_MANAGER, mark_commission_entry_paid, paid, approved_payout(entry(paid).commission_amount).name)
 		standalone_credit_note(invoice, qty=1)
 		[deduction] = by_person(invoice, "Deduction").values()
 

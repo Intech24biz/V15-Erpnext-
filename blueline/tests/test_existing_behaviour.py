@@ -19,6 +19,7 @@ from blueline.tests.utils import (
 	act,
 	approved_invoice,
 	approved_payment_for,
+	approved_payout,
 	as_user,
 	commission_entries,
 	make_petty_cash_voucher,
@@ -124,36 +125,43 @@ class TestMarkAsPaid(BluelineTestCase):
 		update_entry(name, FINANCIAL_MANAGER, approved_by_management=1)
 		update_entry(name, GI_MANAGEMENT, approved_by_technical=1)
 
+	def payout_for(self, name):
+		return approved_payout(frappe.db.get_value(SCE, name, "commission_amount"))
+
 	def test_financial_manager_marks_paid(self):
 		name, invoice, payment = pending_commission_entry()
 		self.approve(name)
-		result = act(FINANCIAL_MANAGER, mark_commission_entry_paid, name, payment.name)
+		payout = self.payout_for(name)
+		result = act(FINANCIAL_MANAGER, mark_commission_entry_paid, name, payout.name)
 		self.assertTrue(result["ok"])
 		entry = frappe.get_doc(SCE, name)
-		self.assertEqual((entry.status, entry.payment_entry), ("Paid", payment.name))
+		self.assertEqual((entry.status, entry.payment_entry), ("Paid", payout.name))
 
 	def test_other_roles_cannot_mark_paid(self):
 		name, invoice, payment = pending_commission_entry()
 		self.approve(name)
+		payout = self.payout_for(name)
 		self.assertRefused(
-			lambda: act(GI_MANAGEMENT, mark_commission_entry_paid, name, payment.name),
+			lambda: act(GI_MANAGEMENT, mark_commission_entry_paid, name, payout.name),
 			"Only System Manager or Financial Manager",
 		)
 
 	def test_only_approved_entries_can_be_paid(self):
 		name, invoice, payment = pending_commission_entry()
+		payout = self.payout_for(name)
 		self.assertRefused(
-			lambda: act(FINANCIAL_MANAGER, mark_commission_entry_paid, name, payment.name),
+			lambda: act(FINANCIAL_MANAGER, mark_commission_entry_paid, name, payout.name),
 			"Only an Approved commission entry",
 		)
 
-	def test_payment_must_reference_the_invoice(self):
+	def test_the_customer_receipt_is_not_a_payout(self):
+		"""Until this release Mark as Paid took the invoice's own (Receive) payment; a
+		commission payout is now a Payment Entry of type Pay."""
 		name, invoice, payment = pending_commission_entry()
 		self.approve(name)
-		other_payment = approved_payment_for(approved_invoice())
 		self.assertRefused(
-			lambda: act(FINANCIAL_MANAGER, mark_commission_entry_paid, name, other_payment.name),
-			f"does not reference Sales Invoice {invoice.name}",
+			lambda: act(FINANCIAL_MANAGER, mark_commission_entry_paid, name, payment.name),
+			"must be of type Pay",
 		)
 
 

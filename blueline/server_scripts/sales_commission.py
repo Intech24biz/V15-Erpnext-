@@ -4,6 +4,7 @@ from frappe.utils import flt, fmt_money, now_datetime
 
 from blueline.blueline.doctype.sales_commission_entry.sales_commission_entry import (
 	CREDIT_NOTE_ADJUSTMENT_FLAG,
+	DEDUCTION_NOT_PAYABLE,
 	PAYMENT_UNDONE_FLAG,
 	invoice_outstanding,
 )
@@ -710,10 +711,32 @@ def _save_credit_note_change(entry, comment):
 	entry.add_comment("Info", comment)
 
 
+def guard_payout_cancel(doc, method=None):
+	"""Payment Entry `before_cancel`: a payout that Paid commission entries point to can't be
+	cancelled. ERPNext's own link check would refuse too, but only after on_cancel and with a
+	generic message; this names the entries and refuses before anything is reversed."""
+	paid = frappe.get_all(
+		ENTRY_DOCTYPE,
+		filters={"payment_entry": doc.name, "docstatus": 1, "status": PAID_STATUS},
+		pluck="name",
+		order_by="name asc",
+	)
+	if paid:
+		frappe.throw(
+			_(
+				"Payment Entry {0} paid out commission entries {1}, which are marked Paid. "
+				"It can't be cancelled while they point to it."
+			).format(frappe.bold(doc.name), ", ".join(paid)),
+			title=_("Commission Payout"),
+		)
+
+
 @frappe.whitelist()
 def mark_commission_entry_paid(commission_entry, payment_entry):
-	"""Manual action: link an Approved commission entry to the real Payment Entry that
-	paid it out and mark it Paid. No automatic bank-file matching.
+	"""Link an Approved commission entry to the Payment Entry (type Pay) that paid it out and
+	mark it Paid, in one step. The form does the same in two (pick Payment Entry, Update,
+	then Actions > Mark as Paid); either way the rules are enforced by the entry itself
+	(SalesCommissionEntry.validate_payment_link). No automatic bank-file matching.
 	"""
 	if not (MARK_PAID_ROLES & set(frappe.get_roles())):
 		frappe.throw(
@@ -728,26 +751,7 @@ def mark_commission_entry_paid(commission_entry, payment_entry):
 
 	if entry.entry_type == DEDUCTION_TYPE:
 		# A deduction is settled by netting it off a later payout, which is not built yet.
-		frappe.throw(
-			_("{0} is a deduction. Deductions are taken off a payout, not marked as Paid.").format(entry.name)
-		)
-
-	pe = frappe.db.get_value("Payment Entry", payment_entry, ["name", "docstatus"], as_dict=True)
-	if not pe or pe.docstatus != 1:
-		frappe.throw(_("{0} is not a submitted Payment Entry.").format(payment_entry))
-
-	references_match = frappe.db.exists(
-		"Payment Entry Reference",
-		{
-			"parent": payment_entry,
-			"reference_doctype": "Sales Invoice",
-			"reference_name": entry.sales_invoice,
-		},
-	)
-	if not references_match:
-		frappe.throw(
-			_("{0} does not reference Sales Invoice {1}.").format(payment_entry, entry.sales_invoice)
-		)
+		frappe.throw(_(DEDUCTION_NOT_PAYABLE).format(entry.name))
 
 	entry.payment_entry = payment_entry
 	entry.status = PAID_STATUS

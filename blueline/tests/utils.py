@@ -178,6 +178,63 @@ def approved_payment_for(invoice, creator=GI_TECH, approver=GI_MANAGEMENT):
 	return reload(pe)
 
 
+def payable_account(company):
+	"""The company's payable account. Blueline Enterprises has none in this data, so a test-only
+	'Commission Payable' leaf is created under its first liability group (rolled back with
+	the test)."""
+	account = frappe.get_cached_value("Company", company, "default_payable_account") or frappe.db.get_value(
+		"Account", {"company": company, "account_type": "Payable", "is_group": 0}
+	)
+	if account:
+		return account
+	parent = frappe.db.get_value(
+		"Account", {"company": company, "root_type": "Liability", "is_group": 1, "parent_account": ["is", "set"]}, "name"
+	)
+	abbr = frappe.get_cached_value("Company", company, "abbr")
+	return frappe.get_doc(
+		{
+			"doctype": "Account",
+			"account_name": "Commission Payable (test)",
+			"company": company,
+			"parent_account": parent,
+			"account_type": "Payable",
+			"root_type": "Liability",
+			"report_type": "Balance Sheet",
+			"account_currency": frappe.get_cached_value("Company", company, "default_currency"),
+		}
+	).insert(ignore_permissions=True).name or f"Commission Payable (test) - {abbr}"
+
+
+def make_payout(amount, user=GI_TECH, company=COMPANY, party_type="Supplier", party=SUPPLIER):
+	"""Draft Payment Entry of type Pay — what a commission payout is recorded as."""
+	paid_to = payable_account(company)
+	with as_user(user):
+		pe = frappe.new_doc("Payment Entry")
+		pe.payment_type = "Pay"
+		pe.company = company
+		pe.posting_date = nowdate()
+		pe.party_type = party_type
+		pe.party = party
+		pe.paid_from = frappe.db.get_value("Account", {"company": company, "account_type": "Cash", "is_group": 0})
+		pe.paid_to = paid_to
+		pe.paid_from_account_currency = pe.paid_to_account_currency = frappe.get_cached_value(
+			"Company", company, "default_currency"
+		)
+		pe.source_exchange_rate = pe.target_exchange_rate = 1
+		pe.paid_amount = pe.received_amount = amount
+		pe.reference_no, pe.reference_date = "commission payout", nowdate()
+		pe.insert()
+		return pe
+
+
+def approved_payout(amount, creator=GI_TECH, approver=GI_MANAGEMENT, **kwargs):
+	"""Commission payout (Payment Entry, type Pay) approved through the workflow."""
+	pe = make_payout(amount, creator, **kwargs)
+	workflow(pe, "Send for Approval", creator)
+	workflow(pe, "Approve", approver)
+	return reload(pe)
+
+
 def commission_entries(invoice_name, **filters):
 	return frappe.get_all(
 		"Sales Commission Entry",

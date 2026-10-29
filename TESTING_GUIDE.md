@@ -13,6 +13,7 @@
 > **Updated 2026-10-29 (branch `feature/credit-note-commission-approval-roles`, not deployed):**
 > - **Credit Notes now adjust commission** (K11 resolved). Approving a Credit Note reduces the original invoice's unpaid commission entries in proportion to what was returned (a full return cancels them), and creates a negative **Deduction** entry for commission that was already paid. Cancelling the Credit Note undoes all of it. No ledger entries are involved. New section **2.9**; changed **2.8** step 5 and **3.7** step 12.
 > - **Credit Notes are applied with Payment Reconciliation** (new **3.7 C**; 2.8 step 4 changed). Production's ERPNext has no "Update Outstanding for Self" option, so a Credit Note always stands on the customer's account until the accountant reconciles it against the invoice. **Commission is now released whenever the invoice's outstanding reaches 0 by any route** — payment, reconciliation, Journal Entry, in any order — and never earlier.
+> - **Mark as Paid needs the real payout** (2.6 rewritten): an entry becomes Paid only with a submitted Payment Entry of type Pay, same company, linked; one payout can cover several entries up to its Paid Amount; the link is locked once Paid and the payout can't be cancelled. Mark as Paid no longer takes the customer's receipt.
 > - **No commission approval while the invoice is unpaid** (new **2.10**): neither tick, the Approve action, nor any other route to Approved is accepted — for any role — until the invoice's outstanding is 0. If a payment is undone later, untouched entries go back to Accrued; ticked, Approved or Paid ones keep their status and show a **Payment Warning**.
 > - **Deduction entries need the two-person approval** (start in *Payment Received - Pending Approval*), and **a Credit Note whose commission can't be adjusted is refused** with *"Commission could not be adjusted for this Credit Note; nothing was changed. Contact the administrator."* — nothing is half-done. See 2.9 C and H.
 > - **Approver roles are changed in the Workflow screen and stay changed.** Previously every update (bench migrate) silently put the shipped approver roles and notification recipients back. Workflows and pending-approval notifications are now only created if missing, never overwritten; only a System Manager can edit a workflow, and each change is recorded. New section **3.8**.
@@ -290,11 +291,16 @@ Do these on the entry **before** step 2.4.8 (while "Approved by Technical" is st
 
 > **Check this one carefully.** This is the **first real-world confirmation** of the accountant's "Mark as Paid" path: the fix was deployed when production had **zero** Sales Commission Entries, so it has only been verified in local tests, never on production.
 
-1. As **the accountant**: open the Approved entry → **Actions → Mark as Paid**.
-   **Expected:** **Status = Paid** — reload the page and confirm it is still Paid. The **Payment Entry** field on the commission entry stays **empty** (the browser has no way to link the payout payment; it's informational).
-2. **Only if step 1 did not reach Paid:** as **ceo@gen-innov.com** (System Manager): **Actions → Mark as Paid** → **Expected:** **Status = Paid**. Record that step 1 failed.
-3. **Wrong results:** after the accountant's Mark as Paid, the status is still **Approved** after reload (the K1 bug has come back), or an error appears.
-4. **New — still locked once Paid.** As **ceo@**: try to untick either approval box → **Update**. **Expected:** refused — *"… cannot be changed once the entry is Paid."*
+> **Changed (feature/final-items): an entry only becomes Paid with the payout's Payment Entry linked.** Before you start: the company needs a **Payable** account to pay commission from (Blueline Enterprises has none in the copied data — ask the accountant to create e.g. *Commission payable - BEPL*), and a submitted **Payment Entry of type Pay** for the payout (to the sales person as Employee, or as Supplier for an outside agent), approved through the usual workflow by two people.
+
+0. **Refused without a link [SAFE]:** as **the accountant**, open the Approved entry → **Actions → Mark as Paid** without choosing a Payment Entry. **Expected:** refused — *"Select the Payment Entry that paid this commission out before marking it Paid."*
+1. As **the accountant**: in **Payment Entry** (the field is editable only while the entry is Approved), pick the payout. The list only offers **submitted** Payment Entries of type **Pay** for the **same company**. Click **Update**, then **Actions → Mark as Paid**.
+   **Expected:** **Status = Paid**, and **Payment Entry** shows the payout. Reload: still Paid.
+2. **Wrong payouts are refused [SAFE]** (type the name into the field if it isn't listed): a draft payout → *"… is not a submitted Payment Entry (it is a draft or cancelled)."*; the customer's receipt (type Receive) → *"… must be of type Pay."*; another company's payout → *"… belongs to …"*.
+3. **One payout, several entries:** link a second Approved entry to the same payout. **Expected:** accepted while the linked commission adds up to no more than the payout's Paid Amount; the entry that would go over is refused — *"… paid out …; adding this entry (…) would make …, more than was paid."*
+4. **Locked once Paid:** as **ceo@** (System Manager) try to change or clear **Payment Entry**, and try to untick either approval box → **Update**. **Expected:** refused — *"Payment Entry can't be changed once the entry is Paid."* / *"… cannot be changed once the entry is Paid."*
+5. **The payout can't be cancelled:** as ceo@ open the payout Payment Entry → **Cancel**. **Expected:** refused — *"Payment Entry … paid out commission entries SCE-…, which are marked Paid. It can't be cancelled while they point to it."*
+6. **Wrong results:** Paid with an empty Payment Entry; a receipt, draft or other-company payout accepted; the total linked to one payout above its Paid Amount; the link changed after Paid; the payout cancelled.
 
 ### 2.7 Multi-payee sale — as `ceo@gen-innov.com` — [PERMANENT]
 
@@ -659,7 +665,7 @@ Tick **P** (pass), **F** (fail), or **K** (known issue from 0.5).
 | 2.4s | Safeguard: Actions → Approve refused with 0 boxes and with 1 box ("Both approvals are required…") | ☐ | ☐ | |
 | 2.4l | **New:** ticks locked once Approved (office@ and ceo@ refused) | ☐ | ☐ | |
 | 2.5 | Wrong-person tick refused with a clear "Required role" message | ☐ | ☐ | |
-| 2.6 | Mark as Paid by the accountant → Paid (first production confirmation); ticks still locked | ☐ | ☐ | |
+| 2.6 | **Changed:** Mark as Paid needs the payout's Payment Entry (submitted, type Pay, same company, not overspent); link and ticks locked once Paid; the payout can't be cancelled | ☐ | ☐ | |
 | 2.7 | Multi-payee invoice → 3 entries with correct credited-to and amounts | ☐ | ☐ | |
 | 2.8 | Cleanup: invoice Cancel refused; reversed by Credit Note; unpaid commission Cancelled, none under the Credit Note | ☐ | ☐ | |
 | 2.10 | **New:** no tick / Approve / Approved while the invoice owes money (any role); undone payment → untouched entries back to Accrued, ticked/Approved ones keep status with a Payment Warning, cleared when paid again | ☐ | ☐ | |

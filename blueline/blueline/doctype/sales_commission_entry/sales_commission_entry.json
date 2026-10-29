@@ -85,12 +85,14 @@
   },
   {
    "allow_on_submit": 1,
+   "description": "The Payment Entry (type Pay) that paid this commission out. Chosen by the Financial Manager on an Approved entry, before Actions → Mark as Paid. Locked once Paid.",
    "fieldname": "payment_entry",
    "fieldtype": "Link",
    "label": "Payment Entry",
+   "no_copy": 1,
    "options": "Payment Entry",
    "permlevel": 3,
-   "read_only": 1
+   "read_only_depends_on": "eval:doc.status != 'Approved' || doc.entry_type == 'Deduction'"
   },
   {
    "fieldname": "parties_section",
@@ -353,7 +355,7 @@
  "index_web_pages_for_search": 0,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-10-29 12:00:00.000000",
+ "modified": "2026-10-29 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "Blueline",
  "name": "Sales Commission Entry",

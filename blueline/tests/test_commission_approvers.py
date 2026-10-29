@@ -10,6 +10,7 @@ from blueline.tests.utils import (
 	GI_MANAGEMENT,
 	SYSTEM_MANAGER,
 	BluelineTestCase,
+	approved_payout,
 	as_user,
 	pending_commission_entry,
 	update_entry,
@@ -117,8 +118,9 @@ class TestCommissionApprovers(BluelineTestCase):
 		name, invoice, payment = pending_commission_entry()
 		update_entry(name, FINANCIAL_MANAGER, approved_by_management=1)
 		update_entry(name, TECHNICAL_APPROVER, approved_by_technical=1)
+		payout = approved_payout(entry(name).commission_amount)
 		with as_user(FINANCIAL_MANAGER):
-			mark_commission_entry_paid(name, payment.name)
+			mark_commission_entry_paid(name, payout.name)
 		self.assertEqual(entry(name).status, "Paid")
 
 		self.assertRefused(lambda: update_entry(name, SYSTEM_MANAGER, approved_by_technical=0), LOCKED)

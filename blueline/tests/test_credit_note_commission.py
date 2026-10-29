@@ -21,6 +21,7 @@ from blueline.tests.utils import (
 	act,
 	approved_invoice,
 	approved_payment_for,
+	approved_payout,
 	as_user,
 	commission_entries,
 	reload,
@@ -92,10 +93,11 @@ def paid_invoice_with_mixed_statuses():
 	"""Fully paid invoice whose three entries are Paid (Prasanna), Approved (Darshani) and
 	Payment Received - Pending Approval (Paris)."""
 	invoice = approved_invoice()
-	payment = approved_payment_for(invoice)
+	approved_payment_for(invoice)
 	by_person = entries_by_person(invoice)
 	approve(by_person["W.B.Prasanna"].name)
-	act(FINANCIAL_MANAGER, mark_commission_entry_paid, by_person["W.B.Prasanna"].name, payment.name)
+	payout = approved_payout(by_person["W.B.Prasanna"].commission_amount)
+	act(FINANCIAL_MANAGER, mark_commission_entry_paid, by_person["W.B.Prasanna"].name, payout.name)
 	approve(by_person["M.Madusha Darshani"].name)
 	statuses = {p: e.status for p, e in entries_by_person(invoice).items()}
 	assert statuses == {

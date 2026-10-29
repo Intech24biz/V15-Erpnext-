@@ -17,6 +17,9 @@ PAYMENT_UNDONE_FLAG = "payment_undone"
 SYSTEM_FLAGS = (CREDIT_NOTE_ADJUSTMENT_FLAG, PAYMENT_UNDONE_FLAG)
 
 DEDUCTION_TYPE = "Deduction"
+PAYOUT_TYPE = "Pay"
+DEDUCTION_NOT_PAYABLE = "{0} is a deduction. Deductions are taken off a payout, not marked as Paid."
+
 UNPAID_MESSAGE = (
 	"This commission cannot be approved while the invoice still has an outstanding amount. "
 	"Wait until the invoice is fully paid or credited."
@@ -89,6 +92,7 @@ class SalesCommissionEntry(Document):
 		self.keep_system_warning()
 		self.apply_approval_rules()
 		self.refuse_approval_while_unpaid()
+		self.validate_payment_link()
 
 	def is_system_change(self):
 		return any(self.flags.get(flag) for flag in SYSTEM_FLAGS)
@@ -114,6 +118,94 @@ class SalesCommissionEntry(Document):
 		self.auto_promote_to_approved()
 		self.refuse_approval_while_unpaid()
 		self.require_both_approvals()
+		self.validate_payment_link()
+
+	def validate_payment_link(self):
+		"""Paid means paid out by a real Payment Entry. Holds for every user and role,
+		Administrator and System Manager included, and for every route (the Mark as Paid
+		action, the API, a direct save):
+		- an entry only becomes Paid with Payment Entry set;
+		- the Payment Entry is submitted, of type Pay, for the same company, and the
+		  commission linked to it never adds up to more than it paid out;
+		- once Paid, the link can't change (an entry is never marked Paid twice).
+		Entries marked Paid before this rule existed keep their empty link untouched.
+		"""
+		before = self.get_doc_before_save()
+		if before and before.status == PAID_STATUS:
+			if cstr(self.payment_entry) != cstr(before.payment_entry):
+				frappe.throw(
+					_("{0} can't be changed once the entry is Paid.").format(frappe.bold(_("Payment Entry"))),
+					title=_("Payment Locked"),
+				)
+			return
+
+		becoming_paid = self.status == PAID_STATUS
+		link_changed = cstr(self.payment_entry) != cstr(before.payment_entry if before else None)
+		if not (becoming_paid or link_changed):
+			return
+		if self.entry_type == DEDUCTION_TYPE and (becoming_paid or self.payment_entry):
+			frappe.throw(_(DEDUCTION_NOT_PAYABLE).format(self.name))
+		if becoming_paid and not self.payment_entry:
+			frappe.throw(
+				_("Select the {0} that paid this commission out before marking it Paid.").format(
+					frappe.bold(_("Payment Entry"))
+				),
+				title=_("Payment Entry Required"),
+			)
+		if not self.payment_entry:
+			return  # clearing a link picked by mistake, before Mark as Paid
+		if self.status not in (APPROVED_STATUS, PAID_STATUS):
+			frappe.throw(_("A Payment Entry can only be linked once the commission entry is Approved."))
+		self.validate_payout()
+
+	def validate_payout(self):
+		# FOR UPDATE: two entries linked to one payout at the same moment can't both pass
+		# the total check below.
+		pe = frappe.db.sql(
+			"""select name, docstatus, payment_type, company, base_paid_amount
+			from `tabPayment Entry` where name = %s for update""",
+			self.payment_entry,
+			as_dict=True,
+		)
+		if not pe:
+			frappe.throw(_("Payment Entry {0} does not exist.").format(self.payment_entry))
+		pe = pe[0]
+		if pe.docstatus != 1:
+			frappe.throw(
+				_("{0} is not a submitted Payment Entry (it is a draft or cancelled).").format(frappe.bold(pe.name))
+			)
+		if pe.payment_type != PAYOUT_TYPE:
+			frappe.throw(
+				_("{0} is a {1} Payment Entry. A commission payout must be of type {2}.").format(
+					frappe.bold(pe.name), _(pe.payment_type), _(PAYOUT_TYPE)
+				)
+			)
+		if pe.company != self.company:
+			frappe.throw(
+				_("{0} belongs to {1}, not {2}.").format(frappe.bold(pe.name), pe.company, self.company)
+			)
+
+		precision = self.precision("commission_amount")
+		others = frappe.db.sql(
+			"""select coalesce(sum(commission_amount), 0) from `tabSales Commission Entry`
+			where payment_entry = %s and docstatus = 1 and name != %s""",
+			(pe.name, self.name or ""),
+		)[0][0]
+		linked = flt(flt(others) + flt(self.commission_amount), precision)
+		if linked > flt(pe.base_paid_amount, precision):
+			frappe.throw(
+				_(
+					"{0} paid out {1}. Commission already linked to it is {2}; adding this entry ({3}) "
+					"would make {4}, more than was paid."
+				).format(
+					frappe.bold(pe.name),
+					frappe.format_value(pe.base_paid_amount, {"fieldtype": "Currency"}),
+					frappe.format_value(others, {"fieldtype": "Currency"}),
+					frappe.format_value(self.commission_amount, {"fieldtype": "Currency"}),
+					frappe.format_value(linked, {"fieldtype": "Currency"}),
+				),
+				title=_("Payment Entry Overspent"),
+			)
 
 	def keep_system_warning(self):
 		# Payment Warning is written only by the system (sales_commission.reopen_if_unsettled).
