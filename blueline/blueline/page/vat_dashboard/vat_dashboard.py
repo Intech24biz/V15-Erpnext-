@@ -90,6 +90,7 @@ def get_vat_data(company, from_date=None, to_date=None):
 		"raw_summary": dict(empty_summary),
 		"monthly": [],
 		"account_detail": [],
+		"discrepancies": [],
 	}
 	if not accounts:
 		return empty_result
@@ -152,11 +153,10 @@ def get_vat_data(company, from_date=None, to_date=None):
 	for row in account_detail:
 		row["amount"] = flt(row["amount"], 2)
 
-	# Summary cards: reclassify per account, not per transaction. An OUTPUT (Liability)
-	# account whose net movement for the period is a debit balance isn't payable VAT —
-	# it's a recoverable credit, so its absolute value rolls into total_input instead.
-	# This keeps total_output honest (never negative) without touching account_detail,
-	# which still shows each account's real, unadjusted net movement.
+	# Regrouped summary (opt-in on the page; raw is the default): an OUTPUT (Liability)
+	# account whose net movement for the period is a debit balance has its absolute value
+	# rolled into total_input. The net is unchanged. Every such account is also listed in
+	# "discrepancies", so regrouping never hides it.
 	total_output = 0.0
 	total_input = 0.0
 	for row in account_detail:
@@ -197,4 +197,28 @@ def get_vat_data(company, from_date=None, to_date=None):
 		"raw_summary": raw_summary,
 		"monthly": monthly,
 		"account_detail": account_detail,
+		"discrepancies": get_discrepancies(account_detail),
 	}
+
+
+def get_discrepancies(account_detail):
+	"""VAT accounts whose net movement for the period runs the wrong way: an Output account
+	with a debit balance, or an Input account with a credit balance. Each is usually a
+	posting error (wrong account or direction) for the accountant to check, so the page
+	lists them by name rather than only folding them into the cards."""
+	expected = {"output": _("credit"), "input": _("debit")}
+	actual = {"output": _("debit"), "input": _("credit")}
+	rows = []
+	for row in account_detail:
+		classification = row["classification"]
+		if classification in expected and row["amount"] < 0:
+			rows.append(
+				{
+					"account": row["account"],
+					"classification": classification,
+					"amount": flt(abs(row["amount"]), 2),
+					"expected_balance": expected[classification],
+					"actual_balance": actual[classification],
+				}
+			)
+	return rows

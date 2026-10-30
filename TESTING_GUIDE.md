@@ -628,10 +628,13 @@ While logged in, open these URLs in the browser (read-only; they return the dash
 - **Wrong result:** "Transport - private vehicle expenses - I24" appears for Global Intech.
 
 ### 5.5 "Show raw ledger totals" toggle — [SAFE]
-1. With Blueline selected, the toggle **Show raw ledger totals** above the cards is **off**. **Expected** line under the cards: *"Cards regroup wrong-direction balances; the monthly table shows raw figures."*
-2. Tick the toggle. **Expected:** the cards' labels end in *(raw ledger)*, Blueline's Output card shows the posted figure (**−564,871.43** on the 2026-10-08 figures), and the line under the cards reads exactly *"Showing raw ledger totals; no regrouping applied."* The Net card, chart and monthly table don't change.
-3. Untick it. **Expected:** the original cards and the original line come back.
-4. **Wrong results:** the line doesn't change with the toggle; the Net figure differs between on and off.
+> **Changed (branch `feature/vat-discrepancies`):** raw totals are now the default, and wrong-direction balances are listed as discrepancies.
+
+1. With Blueline selected, the toggle **Show raw ledger totals** above the cards is **on**. **Expected:** the cards' labels end in *(raw ledger)*, Blueline's Output card shows the posted figure (**−564,871.43** on the 2026-10-08 figures), and the line under the cards reads exactly *"Showing raw ledger totals; no regrouping applied."*
+2. **Discrepancies panel:** above the toggle, a red box *"Ledger discrepancies: N VAT account(s) with a wrong-direction balance"* lists each Output VAT account with a debit balance (and any Input VAT account with a credit balance) for the period: account, *Should be* / *Is*, amount. Each account name opens the General Ledger for it. Pick a company and period with no such account → the box is not shown.
+3. Untick the toggle. **Expected:** regrouped cards; the line reads *"Regrouped: Output accounts with a debit balance are counted under Input. They are still listed as discrepancies above; the monthly table shows raw figures."* The discrepancies box stays. The Net card, chart and monthly table don't change.
+4. **Export to Excel:** the CSV ends with a *Ledger discrepancies* block listing the same accounts.
+5. **Wrong results:** the toggle starts off; the discrepancies box disappears when regrouped; the Net figure differs between on and off.
 
 ---
 

@@ -204,13 +204,15 @@ Notes for the editor are marked **[Editor]** and are not part of the manual.
 
 ---
 
-## VAT Dashboard section (from `feature/vat-raw-ledger-totals` and `feature/final-items`)
+## VAT Dashboard section (from `feature/vat-raw-ledger-totals`, `feature/final-items` and `feature/vat-discrepancies`)
 
 ### Add this paragraph after the description of the summary cards
 
 **New text:**
 
-> **Show raw ledger totals.** Above the cards there is a switch, **Show raw ledger totals**. Off (the default), the cards move any output-VAT account with a debit balance into Input, and the line under the cards says *"Cards regroup wrong-direction balances; the monthly table shows raw figures."* On, the cards show each account exactly as posted — Output can then be negative — and the line reads *"Showing raw ledger totals; no regrouping applied."* The Net VAT figure, the chart and the monthly table are the same either way.
+> **Ledger discrepancies.** If any VAT account's balance for the period runs the wrong way — an Output VAT account with a debit balance, or an Input VAT account with a credit balance — a red box at the top lists it: the account, which way it should be and which way it is, and the amount. This usually means a posting to the wrong account or a reversed entry; click the account name to open its General Ledger and correct it. The box is always shown when there is something to check, and the list is also included in **Export to Excel**.
+>
+> **Show raw ledger totals.** Above the cards there is a switch, **Show raw ledger totals**. On (the default), the cards show each account exactly as posted — Output can then be negative — and the line under the cards reads *"Showing raw ledger totals; no regrouping applied."* Off, the cards count any Output VAT account with a debit balance under Input instead; those accounts are still listed in the discrepancies box. The Net VAT figure, the chart and the monthly table are the same either way.
 
 **[Editor]** Place this in the VAT Dashboard section of the manual; it describes behaviour shipped on the release branch.
 
