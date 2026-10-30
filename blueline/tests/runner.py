@@ -32,6 +32,7 @@ SUITES = (
 	"test_posting_date_guard",
 	"test_workflow_sync",
 	"test_kpi_dashboards",
+	"test_document_folders",
 )
 
 

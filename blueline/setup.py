@@ -28,6 +28,10 @@ def after_migrate():
         workflow_sync.check_drift()
     except Exception:
         frappe.log_error(title="Blueline workflow drift check failed", message=frappe.get_traceback())
+    # Folders only; files are filed into them as they are attached (document_folders.py).
+    from blueline.document_folders import ensure_all_folders
+
+    ensure_all_folders()
 
 
 def create_missing_seed_records():

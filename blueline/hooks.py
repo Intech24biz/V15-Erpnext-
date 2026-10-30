@@ -140,6 +140,13 @@ doc_events = {
         "after_insert": "blueline.server_scripts.customer_master.save_customer_tin",
         "on_update": "blueline.server_scripts.customer_master.save_customer_tin",
     },
+    # Document storage by fiscal year (see document_folders.py).
+    "Fiscal Year": {
+        "after_insert": "blueline.document_folders.on_fiscal_year_insert",
+    },
+    "File": {
+        "before_insert": "blueline.document_folders.file_attachment",
+    },
     # The remaining ledger-posting doctypes (Sales Invoice, Payment Entry, Journal Entry and
     # Petty Cash Voucher carry the guard in their own entries above).
     **{
