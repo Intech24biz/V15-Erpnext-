@@ -30,6 +30,7 @@ SUITES = (
 	"test_coa_valuation_method",
 	"test_vat_discrepancies",
 	"test_posting_date_guard",
+	"test_workflow_sync",
 )
 
 

@@ -14,7 +14,9 @@ required_apps = ["erpnext"]
 # Frappe re-imports fixtures with force=True on every bench migrate, which put back the
 # shipped approver roles over any change a System Manager had made on site. They are
 # seeded from blueline/setup_data/ by setup.after_migrate, insert-only. To change them on
-# an existing site, use the Workflow / Notification screen (or a patch), not those files.
+# an existing site, use the Workflow / Notification screen (or a patch), not those files,
+# then bring the change back into git with workflow_sync.export_snapshot (see
+# docs/WORKFLOW_CHANGES.md).
 fixtures = [
     {"doctype": "Custom Field", "filters": [["module", "=", "Blueline"]]},
     {
