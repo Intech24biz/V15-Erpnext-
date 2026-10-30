@@ -4,7 +4,7 @@
  "docstatus": 0,
  "doctype": "Page",
  "idx": 0,
- "modified": "2026-09-25 00:00:00.000000",
+ "modified": "2026-10-30 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Blueline",
  "name": "business-kpi-dashboard",
@@ -12,7 +12,13 @@
  "page_name": "business-kpi-dashboard",
  "roles": [
   {
-   "role": "All"
+   "role": "System Manager"
+  },
+  {
+   "role": "GI Management"
+  },
+  {
+   "role": "Financial Manager"
   }
  ],
  "script": null,

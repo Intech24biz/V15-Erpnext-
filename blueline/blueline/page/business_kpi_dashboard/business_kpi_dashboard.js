@@ -100,6 +100,11 @@ blueline.BusinessKpiDashboard = class BusinessKpiDashboard {
 					font-size: 32px;
 					color: var(--red-500, #ff5858);
 				}
+				.bkpi .bkpi-card.bkpi-alert { border-top: 4px solid var(--red-500, #ff5858); }
+				.bkpi .bkpi-card-sub { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
+				.bkpi .bkpi-card-alert { font-size: 12px; margin-top: 6px; }
+				.bkpi .bkpi-card-alert a { color: var(--red-600, #e24c4c); }
+				.bkpi .bkpi-section-note { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; }
 				.bkpi .bkpi-table-wrapper { overflow-x: auto; }
 				.bkpi .bkpi-empty {
 					text-align: center;
@@ -158,6 +163,7 @@ blueline.BusinessKpiDashboard = class BusinessKpiDashboard {
 		const cache_key = `${method}:${company || ""}`;
 
 		if (this.cache[cache_key]) {
+			this.response_currency = this.cache[cache_key].currency;
 			render_fn(this.cache[cache_key]);
 			return;
 		}
@@ -169,6 +175,7 @@ blueline.BusinessKpiDashboard = class BusinessKpiDashboard {
 			callback(r) {
 				if (r.message) {
 					me.cache[cache_key] = r.message;
+					me.response_currency = r.message.currency;
 					render_fn(r.message);
 				}
 			},
@@ -188,8 +195,10 @@ blueline.BusinessKpiDashboard = class BusinessKpiDashboard {
 		if (!$panel.find(".bkpi-initialized").length) {
 			$panel.html(`
 				<div class="bkpi-initialized"></div>
+				<div class="bkpi-section-note">${__("Net sales: excluding VAT, in company currency, Credit Notes deducted.")}</div>
+				<div class="row bkpi-cards bkpi-sales-kpis"></div>
 				<div class="bkpi-section">
-					<div class="bkpi-section-title">${__("Revenue Trend (Last 12 Months)")}</div>
+					<div class="bkpi-section-title">${__("Net Sales Trend (Last 12 Months)")}</div>
 					<div class="bkpi-trend-chart"></div>
 				</div>
 				<div class="row">
@@ -213,14 +222,42 @@ blueline.BusinessKpiDashboard = class BusinessKpiDashboard {
 	}
 
 	render_sales_performance($panel, data) {
-		const currency = frappe.defaults.get_default("currency");
+		const currency = this.currency();
+		const k = data.kpis;
+		// Sections the user can't read come back as null (see _readable on the server).
+		const q = k.quotations || { count: "—", value: 0, open_value: 0, converted: "—", conversion_rate: "—" };
+		const no_quotations = !k.quotations;
+		this.render_cards($panel.find(".bkpi-sales-kpis"), [
+			{
+				label: __("Net Sales This Month"),
+				value: format_currency(k.this_month, currency),
+				sub: __("Last month: {0}", [format_currency(k.last_month, currency)]),
+			},
+			{
+				label: __("Net Sales Fiscal Year to Date"),
+				value: format_currency(k.fy_to_date, currency),
+				sub: __("Same period last year: {0}", [format_currency(k.last_fy_to_date, currency)]),
+			},
+			{
+				label: __("Quotations This Fiscal Year"),
+				value: `${q.count}`,
+				sub: no_quotations
+					? __("No access to Quotations")
+					: __("Value {0}; open {1}", [format_currency(q.value, currency), format_currency(q.open_value, currency)]),
+			},
+			{
+				label: __("Quotation Conversion"),
+				value: no_quotations ? "—" : `${q.conversion_rate}%`,
+				sub: no_quotations ? __("No access to Quotations") : __("{0} of {1} ordered", [q.converted, q.count]),
+			},
+		]);
 
 		const $chart = $panel.find(".bkpi-trend-chart").empty();
 		if (data.trend && data.trend.length) {
 			new frappe.Chart($chart[0], {
 				data: {
 					labels: data.trend.map((d) => d.month),
-					datasets: [{ name: __("Revenue"), values: data.trend.map((d) => d.total) }],
+					datasets: [{ name: __("Net Sales"), values: data.trend.map((d) => d.total) }],
 				},
 				type: "line",
 				height: 240,
@@ -273,13 +310,23 @@ blueline.BusinessKpiDashboard = class BusinessKpiDashboard {
 		if (!$panel.find(".bkpi-initialized").length) {
 			$panel.html(`
 				<div class="bkpi-initialized"></div>
-				<div class="bkpi-section">
-					<div class="bkpi-section-title">${__("Outstanding Receivables")}</div>
-					<div class="row bkpi-cards bkpi-receivables-total"></div>
-					<div class="bkpi-receivables-aging"></div>
+				<div class="row bkpi-cards bkpi-health-kpis"></div>
+				<div class="row">
+					<div class="col-md-6 bkpi-section">
+						<div class="bkpi-section-title">${__("Receivables Aging")}</div>
+						<div class="bkpi-receivables-aging"></div>
+					</div>
+					<div class="col-md-6 bkpi-section">
+						<div class="bkpi-section-title">${__("Payables Aging")}</div>
+						<div class="bkpi-payables-aging"></div>
+					</div>
 				</div>
 				<div class="bkpi-section">
-					<div class="bkpi-section-title">${__("VAT Position (Net, All-Time)")}</div>
+					<div class="bkpi-section-title">${__("Cash & Bank Balances")}</div>
+					<div class="bkpi-cash-bank"></div>
+				</div>
+				<div class="bkpi-section">
+					<div class="bkpi-section-title">${__("VAT Position (This Fiscal Year)")}</div>
 					<div class="row bkpi-cards bkpi-vat-position"></div>
 				</div>
 				<div class="bkpi-section">
@@ -293,45 +340,69 @@ blueline.BusinessKpiDashboard = class BusinessKpiDashboard {
 	}
 
 	render_financial_health($panel, data) {
-		const currency = frappe.defaults.get_default("currency");
+		const currency = this.currency();
+		const cash_total = (data.cash_and_bank || []).reduce((sum, r) => sum + r.balance, 0);
+		const outstanding_card = (label, block) =>
+			block
+				? {
+						label,
+						value: format_currency(block.total, currency),
+						sub: __("Overdue: {0}", [format_currency(block.overdue, currency)]),
+						alert: block.overdue > 0,
+				  }
+				: { label, value: "—", sub: __("No access") };
 
-		const $total = $panel.find(".bkpi-receivables-total").empty();
-		$(`
-			<div class="col-md-3">
-				<div class="bkpi-card">
-					<div class="bkpi-card-value">${format_currency(data.receivables.total, currency)}</div>
-					<div class="bkpi-card-label">${__("Total Outstanding")}</div>
-				</div>
-			</div>
-		`).appendTo($total);
+		this.render_cards($panel.find(".bkpi-health-kpis"), [
+			outstanding_card(__("Receivables Outstanding"), data.receivables),
+			outstanding_card(__("Payables Outstanding"), data.payables),
+			{ label: __("Cash & Bank"), value: format_currency(cash_total, currency) },
+		]);
 
-		const $aging = $panel.find(".bkpi-receivables-aging").empty();
-		const has_aging = data.receivables.aging.some((b) => b.amount);
-		if (has_aging) {
-			this.render_simple_table(
-				$aging,
-				data.receivables.aging,
-				[
-					{ label: __("Aging"), value: (r) => r.bucket },
+		[
+			[".bkpi-receivables-aging", data.receivables, __("No outstanding receivables")],
+			[".bkpi-payables-aging", data.payables, __("No outstanding payables")],
+		].forEach(([selector, block, empty_label]) => {
+			const $aging = $panel.find(selector).empty();
+			if (!block) {
+				$aging.html(this.empty(__("No access")));
+			} else if (block.aging.some((b) => b.amount)) {
+				this.render_simple_table($aging, block.aging, [
+					{ label: __("Days Overdue"), value: (r) => r.bucket },
 					{ label: __("Amount"), value: (r) => format_currency(r.amount, currency), right: true },
-				]
-			);
-		} else {
-			$aging.html(this.empty(__("No outstanding receivables")));
-		}
+				]);
+			} else {
+				$aging.html(this.empty(empty_label));
+			}
+		});
+
+		this.render_simple_table($panel.find(".bkpi-cash-bank").empty(), data.cash_and_bank, [
+			{ label: __("Company"), value: (r) => r.company },
+			{ label: __("Account"), value: (r) => r.account },
+			{ label: __("Balance"), value: (r) => format_currency(r.balance, currency), right: true },
+		]);
 
 		const $vat = $panel.find(".bkpi-vat-position").empty();
 		if (data.vat_position && data.vat_position.length) {
 			data.vat_position.forEach((row) => {
-				const value =
-					row.net_vat === null
-						? __("Unavailable")
-						: format_currency(row.net_vat, currency);
+				let value = __("Unavailable");
+				if (row.net_vat !== null) {
+					value =
+						row.net_vat < 0
+							? `${__("Refund")} ${format_currency(Math.abs(row.net_vat), currency)}`
+							: `${__("Payable")} ${format_currency(row.net_vat, currency)}`;
+				}
+				const warning = row.discrepancies
+					? `<div class="bkpi-card-alert"><a href="/app/vat-dashboard">${__(
+							"{0} ledger discrepancy(ies) — open VAT Dashboard",
+							[row.discrepancies]
+					  )}</a></div>`
+					: "";
 				$(`
-					<div class="col-md-3">
-						<div class="bkpi-card">
+					<div class="col-md-4">
+						<div class="bkpi-card ${row.discrepancies ? "bkpi-alert" : ""}">
 							<div class="bkpi-card-value">${value}</div>
 							<div class="bkpi-card-label">${frappe.utils.escape_html(row.company)}</div>
+							${warning}
 						</div>
 					</div>
 				`).appendTo($vat);
@@ -378,17 +449,21 @@ blueline.BusinessKpiDashboard = class BusinessKpiDashboard {
 	}
 
 	render_commission_payroll($panel, data) {
-		const currency = frappe.defaults.get_default("currency");
+		const currency = this.currency();
 
-		const $pending = $panel.find(".bkpi-pending-count").empty();
-		$(`
-			<div class="col-md-4">
-				<div class="bkpi-card bkpi-highlight">
-					<div class="bkpi-card-value">${data.pending_total}</div>
-					<div class="bkpi-card-label">${__("Commission Entries Pending Approval")}</div>
-				</div>
-			</div>
-		`).appendTo($pending);
+		this.render_cards($panel.find(".bkpi-pending-count"), [
+			{
+				label: __("Commission Entries Pending Approval"),
+				value: `${data.pending_total}`,
+				alert: data.pending_total > 0,
+			},
+			{ label: __("Approved, Not Yet Paid"), value: format_currency(data.approved_unpaid, currency) },
+			{
+				label: __("Outstanding Deductions"),
+				value: format_currency(data.outstanding_deductions, currency),
+				sub: __("Taken off the next payout"),
+			},
+		]);
 
 		const $status = $panel.find(".bkpi-status-by-company").empty();
 		if (data.status_by_company && data.status_by_company.length) {
@@ -431,7 +506,7 @@ blueline.BusinessKpiDashboard = class BusinessKpiDashboard {
 			$panel.find(".bkpi-top-salespeople").empty(),
 			data.top_salespeople,
 			[
-				{ label: __("Sales Person"), value: (r) => r.sales_person },
+				{ label: __("Commission Credited To"), value: (r) => r.commission_credited_to },
 				{ label: __("Commission Earned"), value: (r) => format_currency(r.total, currency), right: true },
 			]
 		);
@@ -440,6 +515,27 @@ blueline.BusinessKpiDashboard = class BusinessKpiDashboard {
 	// ------------------------------------------------------------------
 	// Shared helpers
 	// ------------------------------------------------------------------
+
+	// Each response carries the company's currency (or the system default for all companies).
+	currency() {
+		return this.response_currency || frappe.defaults.get_default("currency");
+	}
+
+	render_cards($el, cards) {
+		$el.empty();
+		const width = Math.max(3, Math.floor(12 / cards.length));
+		cards.forEach((card) => {
+			$(`
+				<div class="col-md-${width} col-sm-6">
+					<div class="bkpi-card ${card.alert ? "bkpi-alert" : ""}">
+						<div class="bkpi-card-value">${card.value}</div>
+						<div class="bkpi-card-label">${card.label}</div>
+						${card.sub ? `<div class="bkpi-card-sub">${card.sub}</div>` : ""}
+					</div>
+				</div>
+			`).appendTo($el);
+		});
+	}
 
 	render_simple_table($el, rows, columns) {
 		if (!rows || !rows.length) {
