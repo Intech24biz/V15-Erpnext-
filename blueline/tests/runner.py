@@ -31,6 +31,7 @@ SUITES = (
 	"test_vat_discrepancies",
 	"test_posting_date_guard",
 	"test_workflow_sync",
+	"test_kpi_dashboards",
 )
 
 

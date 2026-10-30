@@ -286,3 +286,31 @@ Notes for the editor are marked **[Editor]** and are not part of the manual.
 > 9. The sales commission on the invoice is adjusted automatically when the Credit Note is approved (see 3.2a). Commission already paid shows up as a deduction on the Sales Commission Register. Commission on the rest of the invoice becomes ready for approval as soon as nothing is left to pay — whether that happens through a payment, this reconciliation, or both, in any order.
 >
 > **[Editor]** Production's ERPNext has no "Update Outstanding for Self" option on a Credit Note, so these steps always use Payment Reconciliation. If ERPNext is upgraded and the option appears, keep it ticked and these steps still apply.
+
+---
+
+## New section — Dashboards (from branch `feature/kpi-dashboards`)
+
+### Add as a new section after the VAT Dashboard section
+
+**New text:**
+
+> **Dashboards**
+>
+> Both dashboards are on the **Blueline Control Center** workspace, under **Dashboards**.
+>
+> **My Dashboard** — for everyone. It shows your own work:
+>
+> - **Waiting for my approval** — documents someone else sent for approval that you are allowed to approve. Documents you created or sent yourself are never listed here, because you can't approve them. Click a document to open it.
+> - **Sent by me, still waiting** — documents you sent for approval that nobody has approved yet, and how long they have been waiting.
+> - **My drafts** — documents you started but haven't sent for approval.
+> - **My quotations** — submitted this month, and those still open.
+> - **My sales and commission** — your net sales this month and this fiscal year, and your commission by status. This shows only if your user is linked to your Sales Person (your administrator sets your **User ID** on your Employee record, and that Employee on your Sales Person).
+>
+> **Business KPI Dashboard** — for management (GI Management, the Financial Manager and System Managers). Choose a **Company**, or leave it empty for all companies you can see. Three tabs:
+>
+> - **Sales Performance** — net sales this month (with last month) and this fiscal year (with the same period last year); quotations this fiscal year and how many became orders; the 12-month trend; top customers and items; sales by company. *Net sales* means excluding VAT, with Credit Notes deducted.
+> - **Financial Health** — receivables and payables outstanding, how much is overdue, and how long (aging); cash and bank balances; each company's VAT position for this fiscal year, with a red warning when the VAT Dashboard lists ledger discrepancies; petty cash this month.
+> - **Commission** — entries waiting for approval, approved but not yet paid, outstanding deductions, this month's commission by status, and the top earners this fiscal year.
+>
+> If a section says **No access**, your role can't read that kind of document; the rest of the dashboard still works.
