@@ -151,10 +151,10 @@ def check_drift(verbose=True):
 
 
 def _report(drift):
+	source = "committed snapshot" if load("workflow.json", snapshot=True) else "original seed (no snapshot committed yet)"
 	if not drift:
-		print("GI workflows and notifications match the committed snapshot.")
+		print(f"GI workflows and notifications match the {source}.")
 		return
-	source = "snapshot" if load("workflow.json", snapshot=True) else "original seed (no snapshot committed yet)"
 	print(f"GI workflows / notifications differ from the {source}:")
 	for record, changes in drift.items():
 		print(f"  {record}")
