@@ -24,8 +24,11 @@ import frappe
 SEED_FILES = {"workflow.json": "Workflow", "notification.json": "Notification"}
 SNAPSHOT_DIR = "snapshot"
 
-# Set by Frappe on every save, or layout-only: never a difference that matters.
+# Set by Frappe on every save, or layout-only: never a difference that matters. "doctype" is
+# dropped from child rows only (live rows carry it, the seed files' rows don't);
+# normalize() puts the record's own doctype back.
 VOLATILE_FIELDS = {
+	"doctype",
 	"name",
 	"owner",
 	"creation",
