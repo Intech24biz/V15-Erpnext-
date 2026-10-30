@@ -23,6 +23,10 @@ def after_install():
 def after_migrate():
     """Run after bench migrate"""
     create_missing_seed_records()
+    # Folders only; files are filed into them as they are attached (document_folders.py).
+    from blueline.document_folders import ensure_all_folders
+
+    ensure_all_folders()
 
 
 def create_missing_seed_records():

@@ -129,7 +129,14 @@ doc_events = {
     "Customer": {
         "after_insert": "blueline.server_scripts.customer_master.save_customer_tin",
         "on_update": "blueline.server_scripts.customer_master.save_customer_tin",
-    }
+    },
+    # Document storage by fiscal year (see document_folders.py).
+    "Fiscal Year": {
+        "after_insert": "blueline.document_folders.on_fiscal_year_insert",
+    },
+    "File": {
+        "before_insert": "blueline.document_folders.file_attachment",
+    },
 }
 
 after_install = "blueline.setup.after_install"
