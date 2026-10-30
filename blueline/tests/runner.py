@@ -27,6 +27,7 @@ SUITES = (
 	"test_approver_roles",
 	"test_item5_commission_matching",
 	"test_coa_valuation_method",
+	"test_workflow_sync",
 )
 
 
