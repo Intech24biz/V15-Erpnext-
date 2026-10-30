@@ -94,3 +94,23 @@ class TestSeedingFromSnapshot(SnapshotTestCase):
 			[r["name"] for r in workflow_sync.seed_records("workflow.json")],
 			[r["name"] for r in workflow_sync.load("workflow.json")],
 		)
+
+
+class TestDriftAgainstTheOriginalSeed(WorkflowTestCase):
+	"""No snapshot committed: records created from the seed files must compare equal to them.
+	(Live child rows carry fields the seed files leave out; that is not drift.)"""
+
+	def test_records_freshly_seeded_show_no_drift(self):
+		with mock.patch.object(workflow_sync, "load", side_effect=lambda f, snapshot=False: None if snapshot else REAL_LOAD(f)):
+			for doctype, name in (("Workflow", "GI Petty Cash Approval"), ("Notification", PETTY_CASH_NOTIFICATION)):
+				frappe.delete_doc(doctype, name, ignore_permissions=True, force=True)
+			create_missing_seed_records()
+			frappe.clear_document_cache("Workflow", "GI Petty Cash Approval")
+			with mock.patch("builtins.print"):
+				drift = workflow_sync.check_drift()
+		for record in ("Workflow GI Petty Cash Approval", f"Notification {PETTY_CASH_NOTIFICATION}"):
+			with self.subTest(record=record):
+				self.assertNotIn(record, drift)
+
+
+REAL_LOAD = workflow_sync.load
