@@ -36,8 +36,8 @@ STATUS_OPTIONS = [
 ]
 
 DEDUCTION_TYPE = "Deduction"
-# Paid can't happen to a deduction today (Mark as Paid refuses it); listed so that netting,
-# once built, closes a deduction by marking it Paid without changing this page.
+# A deduction becomes Paid when it is taken off a payout with the payee's commission
+# (SalesCommissionEntry.settle_deductions); it then leaves the outstanding list.
 SETTLED_DEDUCTION_STATUSES = ["Paid", "Cancelled"]
 
 

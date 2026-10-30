@@ -14,11 +14,16 @@ CANCELLED_STATUS = "Cancelled"
 CREDIT_NOTE_ADJUSTMENT_FLAG = "credit_note_adjustment"
 # Same, for sales_commission.py moving an entry back (or flagging it) after a payment was undone.
 PAYMENT_UNDONE_FLAG = "payment_undone"
-SYSTEM_FLAGS = (CREDIT_NOTE_ADJUSTMENT_FLAG, PAYMENT_UNDONE_FLAG)
+# Same, for settle_deductions() marking a deduction Paid as part of a commission payout.
+PAYOUT_NETTING_FLAG = "payout_netting"
+SYSTEM_FLAGS = (CREDIT_NOTE_ADJUSTMENT_FLAG, PAYMENT_UNDONE_FLAG, PAYOUT_NETTING_FLAG)
 
 DEDUCTION_TYPE = "Deduction"
 PAYOUT_TYPE = "Pay"
-DEDUCTION_NOT_PAYABLE = "{0} is a deduction. Deductions are taken off a payout, not marked as Paid."
+DEDUCTION_NOT_PAYABLE = (
+	"{0} is a deduction. It can't be marked Paid by itself: it is taken off the person's payout "
+	"automatically when their next commission entry is marked Paid."
+)
 
 UNPAID_MESSAGE = (
 	"This commission cannot be approved while the invoice still has an outstanding amount. "
@@ -191,20 +196,92 @@ class SalesCommissionEntry(Document):
 			where payment_entry = %s and docstatus = 1 and name != %s""",
 			(pe.name, self.name or ""),
 		)[0][0]
-		linked = flt(flt(others) + flt(self.commission_amount), precision)
+		# Deductions (negative) are linked to the same payout when this entry is marked Paid,
+		# so the payout only has to cover the net.
+		deductions = self.deductions_to_settle(pe.name)
+		deducted = flt(sum(d.commission_amount for d in deductions), precision)
+		self.flags.deductions_to_settle = deductions
+		linked = flt(flt(others) + flt(self.commission_amount) + deducted, precision)
 		if linked > flt(pe.base_paid_amount, precision):
 			frappe.throw(
 				_(
 					"{0} paid out {1}. Commission already linked to it is {2}; adding this entry ({3}) "
-					"would make {4}, more than was paid."
+					"and the deductions taken off with it ({4}) would make {5}, more than was paid."
 				).format(
 					frappe.bold(pe.name),
 					frappe.format_value(pe.base_paid_amount, {"fieldtype": "Currency"}),
 					frappe.format_value(others, {"fieldtype": "Currency"}),
 					frappe.format_value(self.commission_amount, {"fieldtype": "Currency"}),
+					frappe.format_value(deducted, {"fieldtype": "Currency"}),
 					frappe.format_value(linked, {"fieldtype": "Currency"}),
 				),
 				title=_("Payment Entry Overspent"),
+			)
+
+	def deductions_to_settle(self, payment_entry):
+		"""Approved deductions still owed by this entry's payee (Commission Credited To, same
+		company), oldest first, that fit into what the payee receives from `payment_entry`:
+		their commission on it, this entry included, never goes below zero. Whole deductions
+		only; one that doesn't fit waits for a later payout.
+		"""
+		if self.entry_type == DEDUCTION_TYPE or not self.commission_credited_to:
+			return []
+
+		precision = self.precision("commission_amount")
+		payee_total = frappe.db.sql(
+			"""select coalesce(sum(commission_amount), 0) from `tabSales Commission Entry`
+			where payment_entry = %s and docstatus = 1 and name != %s and commission_credited_to = %s""",
+			(payment_entry, self.name or "", self.commission_credited_to),
+		)[0][0]
+		payee_total = flt(flt(payee_total) + flt(self.commission_amount), precision)
+
+		# FOR UPDATE: two payouts made at the same moment can't take off the same deduction.
+		candidates = frappe.db.sql(
+			"""select name, commission_amount from `tabSales Commission Entry`
+			where entry_type = %s and docstatus = 1 and status = %s and deduct_from_next_payout = 1
+				and company = %s and commission_credited_to = %s
+				and (payment_entry is null or payment_entry = '')
+			order by posting_date asc, name asc
+			for update""",
+			(DEDUCTION_TYPE, APPROVED_STATUS, self.company, self.commission_credited_to),
+			as_dict=True,
+		)
+		settle = []
+		for deduction in candidates:
+			after = flt(payee_total + flt(deduction.commission_amount), precision)
+			if after < 0:
+				continue
+			payee_total = after
+			settle.append(deduction)
+		return settle
+
+	def on_update_after_submit(self):
+		self.settle_deductions()
+
+	def settle_deductions(self):
+		"""When this commission entry has just become Paid, the deductions validate_payout
+		planned for its payout are linked to the same Payment Entry and marked Paid too."""
+		before = self.get_doc_before_save()
+		if self.status != PAID_STATUS or (before and before.status == PAID_STATUS):
+			return
+		deductions = self.flags.get("deductions_to_settle") or []
+		for row in deductions:
+			deduction = frappe.get_doc(self.doctype, row.name)
+			deduction.payment_entry = self.payment_entry
+			deduction.status = PAID_STATUS
+			deduction.flags.ignore_permissions = True
+			deduction.flags[PAYOUT_NETTING_FLAG] = True
+			deduction.save(ignore_version=False)
+			deduction.add_comment(
+				"Info",
+				_("Taken off payout {0} together with commission entry {1}.").format(self.payment_entry, self.name),
+			)
+		if deductions:
+			self.add_comment(
+				"Info",
+				_("Deductions taken off this payout ({0}): {1}.").format(
+					self.payment_entry, ", ".join(d.name for d in deductions)
+				),
 			)
 
 	def keep_system_warning(self):
