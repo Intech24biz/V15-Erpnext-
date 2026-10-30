@@ -29,6 +29,7 @@ SUITES = (
 	"test_item5_commission_matching",
 	"test_coa_valuation_method",
 	"test_vat_discrepancies",
+	"test_posting_date_guard",
 )
 
 
