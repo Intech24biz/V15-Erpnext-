@@ -282,3 +282,34 @@ Notes for the editor are marked **[Editor]** and are not part of the manual.
 > 9. The sales commission on the invoice is adjusted automatically when the Credit Note is approved (see 3.2a). Commission already paid shows up as a deduction on the Sales Commission Register. Commission on the rest of the invoice becomes ready for approval as soon as nothing is left to pay — whether that happens through a payment, this reconciliation, or both, in any order.
 >
 > **[Editor]** Production's ERPNext has no "Update Outstanding for Self" option on a Credit Note, so these steps always use Payment Reconciliation. If ERPNext is upgraded and the option appears, keep it ticked and these steps still apply.
+
+---
+
+## New section — Document storage by fiscal year (from branch `feature/fiscal-year-folders`)
+
+### Add as a new section at the end of the manual
+
+**New text:**
+
+> **Where your documents are kept**
+>
+> Every file you attach to a document (the paperclip / **Attach** on any form) is stored online and filed automatically by **fiscal year**, **company** and **type of document**. Open them from the document itself, or browse them in **File Manager** (search *File*):
+>
+> *Home → Fiscal Year 2026-2027 → Blueline Enterprises Pvt Ltd → Sales*
+>
+> | Folder | What goes there |
+> |---|---|
+> | Sales | attachments on Quotations, Sales Orders, Delivery Notes, Sales Invoices and Credit Notes |
+> | Purchases | Purchase Orders, Purchase Receipts, Purchase Invoices |
+> | Bank & Payments | Payment Entries, Journal Entries, bank transactions |
+> | Petty Cash | Petty Cash Vouchers |
+> | Shipping & CusDec | Landed Cost Vouchers (CusDec, bills of lading, shipping documents) |
+> | General | anything you want to keep for the year that isn't attached to a document |
+>
+> The fiscal year comes from the document's date, not the day you attach the file, so a file attached in May to a March invoice goes into March's fiscal year.
+>
+> Filing doesn't change who can open a file: an attachment can be opened by the people who can open its document.
+>
+> Folders for a new fiscal year appear automatically when the accountant creates the Fiscal Year.
+
+**[Editor]** Attachments made before this branch was deployed stay in *Home/Attachments* until an administrator runs the one-off move (`blueline.document_folders.refile_existing_attachments`, dry run first).
