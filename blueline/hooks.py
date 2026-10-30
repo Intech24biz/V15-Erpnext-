@@ -94,6 +94,7 @@ doc_events = {
             # commission guard still covers invoices that never received a serial.
             "blueline.server_scripts.tax_invoice_serial.block_cancel_of_tax_invoice",
             "blueline.server_scripts.sales_commission.guard_commission_entries_on_cancel",
+            "blueline.server_scripts.sales_commission.guard_settled_deductions_on_cancel",
         ],
     },
     "Petty Cash Voucher": {
