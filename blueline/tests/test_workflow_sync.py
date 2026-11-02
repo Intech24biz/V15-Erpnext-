@@ -114,3 +114,62 @@ class TestDriftAgainstTheOriginalSeed(WorkflowTestCase):
 
 
 REAL_LOAD = workflow_sync.load
+
+
+class TestDriftAcrossVersions(SnapshotTestCase):
+	"""A snapshot or seed written on another Frappe/ERPNext version can carry fields this
+	site's doctypes don't have (15.110's Workflow Document State.send_email on 15.5): only
+	fields the live doctype has are compared, so those are never drift. Real changes still are."""
+
+	UNKNOWN = "field_this_version_does_not_have"
+
+	def edit_snapshot(self, fname, change):
+		import json
+
+		path = f"{self.tmp}/{fname}"
+		with open(path) as f:
+			records = json.load(f)
+		for record in records:
+			change(record)
+		with open(path, "w") as f:
+			json.dump(records, f)
+
+	def add_unknown_fields(self):
+		def workflow(record):
+			record[self.UNKNOWN] = 1
+			for table in ("states", "transitions"):
+				for row in record[table]:
+					row[self.UNKNOWN] = 1
+
+		def notification(record):
+			record[self.UNKNOWN] = "Markdown"
+			for row in record["recipients"]:
+				row[self.UNKNOWN] = 0
+
+		self.edit_snapshot("workflow.json", workflow)
+		self.edit_snapshot("notification.json", notification)
+
+	def test_fields_the_live_doctype_lacks_are_not_drift(self):
+		self.assertFalse(frappe.get_meta("Workflow Document State").has_field(self.UNKNOWN))
+		self.add_unknown_fields()
+		self.assertEqual(self.drift(), {})
+
+	def test_a_real_change_to_an_existing_field_is_still_drift(self):
+		self.add_unknown_fields()
+
+		def retitle(record):
+			if record["name"] == PO_NOTIFICATION:
+				record["subject"] = "A different subject"
+
+		self.edit_snapshot("notification.json", retitle)
+		changes = self.drift()[f"Notification {PO_NOTIFICATION}"]
+		self.assertEqual(len(changes), 1, changes)
+		self.assertTrue(changes[0].startswith("subject: 'A different subject' -> "), changes)
+
+	def test_a_removed_row_is_still_drift(self):
+		self.add_unknown_fields()
+		set_approve_roles(["GI Management"])  # drops the other Approve rows on site
+		frappe.clear_document_cache("Workflow", PO_WORKFLOW)
+		changes = self.drift()[f"Workflow {PO_WORKFLOW}"]
+		self.assertTrue(changes, "removing approver rows must be reported")
+		self.assertTrue(all("removed row" in c and "action=Approve" in c for c in changes), changes)

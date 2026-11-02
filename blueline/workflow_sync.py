@@ -86,6 +86,26 @@ def normalize(record):
 	return clean
 
 
+def live_fields_only(record, doctype):
+	"""`record` without the fields this site's `doctype` doesn't have, child rows included.
+	Seed files and snapshots written on another Frappe/ERPNext version can carry fields that
+	don't exist here (15.110 has Workflow Document State.send_email, 15.5 doesn't); a field
+	the site can't hold is never a difference on that site."""
+	meta = frappe.get_meta(doctype)
+	kept = {}
+	for key, value in record.items():
+		if key in ("doctype", "name"):
+			kept[key] = value
+			continue
+		df = meta.get_field(key)
+		if not df:
+			continue
+		if df.fieldtype in frappe.model.table_fields and isinstance(value, list):
+			value = _clean([live_fields_only(row, df.options) for row in value])
+		kept[key] = value
+	return kept
+
+
 def live_records(fname):
 	doctype = SEED_FILES[fname]
 	names = [r["name"] for r in load(fname)]
@@ -136,7 +156,7 @@ def check_drift(verbose=True):
 	(or the original seed). Empty when they match."""
 	drift = {}
 	for fname, doctype in SEED_FILES.items():
-		expected = {r["name"]: normalize(r) for r in seed_records(fname)}
+		expected = {r["name"]: live_fields_only(normalize(r), doctype) for r in seed_records(fname)}
 		actual = {r["name"]: r for r in live_records(fname)}
 		for name, record in expected.items():
 			if name not in actual:
