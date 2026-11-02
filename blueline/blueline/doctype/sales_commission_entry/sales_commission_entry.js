@@ -14,7 +14,9 @@ frappe.ui.form.on("Sales Commission Entry", {
 			frm.set_intro(frappe.utils.escape_html(frm.doc.unpaid_warning), "red");
 		} else if (frm.doc.status === "Approved" && frm.doc.entry_type !== "Deduction" && !frm.doc.payment_entry) {
 			frm.set_intro(
-				__("To mark this entry Paid: choose the Payment Entry that paid it out, click Update, then Actions → Mark as Paid."),
+				__(
+					"To mark this entry Paid: choose the Payment Entry that paid it out, click Update, then Actions → Mark as Paid. If this person's approved deductions cancel the whole commission (net 0.00), there is nothing to pay: leave Payment Entry empty and use Actions → Mark as Paid."
+				),
 				"blue"
 			);
 		}

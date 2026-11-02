@@ -54,6 +54,35 @@ def invoice_outstanding(sales_invoice):
 	return flt(row[0].outstanding_amount, get_field_precision(df, currency=row[0].currency))
 
 
+def approved_deductions(company, commission_credited_to, for_update=False):
+	"""A payee's Approved deductions not yet taken off a payout, oldest first: the order they
+	are taken off in."""
+	return frappe.db.sql(
+		"""select name, commission_amount, posting_date from `tabSales Commission Entry`
+		where entry_type = %s and docstatus = 1 and status = %s and deduct_from_next_payout = 1
+			and company = %s and commission_credited_to = %s
+			and (payment_entry is null or payment_entry = '')
+		order by posting_date asc, name asc"""
+		+ (" for update" if for_update else ""),
+		(DEDUCTION_TYPE, APPROVED_STATUS, company, commission_credited_to),
+		as_dict=True,
+	)
+
+
+def fit_deductions(available, deductions, precision):
+	"""The deductions (negative amounts, oldest first) taken off `available` commission:
+	whole ones only, never below zero. One that doesn't fit is skipped and waits, and a
+	later, smaller one may still be taken."""
+	settle = []
+	for deduction in deductions:
+		after = flt(available + flt(deduction.commission_amount), precision)
+		if after < 0:
+			continue
+		available = after
+		settle.append(deduction)
+	return settle
+
+
 class SalesCommissionEntry(Document):
 	def validate_higher_perm_levels(self):
 		# Frappe's own version of this silently resets any field the user can't write at its
@@ -129,7 +158,8 @@ class SalesCommissionEntry(Document):
 		"""Paid means paid out by a real Payment Entry. Holds for every user and role,
 		Administrator and System Manager included, and for every route (the Mark as Paid
 		action, the API, a direct save):
-		- an entry only becomes Paid with Payment Entry set;
+		- an entry only becomes Paid with Payment Entry set, unless the payee's Approved
+		  deductions taken off with it bring it to exactly zero (fully_offset_by_deductions);
 		- the Payment Entry is submitted, of type Pay, for the same company, and the
 		  commission linked to it never adds up to more than it paid out;
 		- once Paid, the link can't change (an entry is never marked Paid twice).
@@ -151,10 +181,13 @@ class SalesCommissionEntry(Document):
 		if self.entry_type == DEDUCTION_TYPE and (becoming_paid or self.payment_entry):
 			frappe.throw(_(DEDUCTION_NOT_PAYABLE).format(self.name))
 		if becoming_paid and not self.payment_entry:
+			if before and before.status == APPROVED_STATUS and self.fully_offset_by_deductions():
+				return
 			frappe.throw(
-				_("Select the {0} that paid this commission out before marking it Paid.").format(
-					frappe.bold(_("Payment Entry"))
-				),
+				_(
+					"Select the {0} that paid this commission out before marking it Paid. It can only be "
+					"left empty when Approved deductions take off the whole commission (net {1})."
+				).format(frappe.bold(_("Payment Entry")), frappe.format_value(0, {"fieldtype": "Currency"})),
 				title=_("Payment Entry Required"),
 			)
 		if not self.payment_entry:
@@ -218,53 +251,54 @@ class SalesCommissionEntry(Document):
 				title=_("Payment Entry Overspent"),
 			)
 
+	def fully_offset_by_deductions(self):
+		"""Marked Paid with no Payment Entry: allowed only when the payee's Approved deductions
+		taken off with this entry bring its commission to exactly zero, since ERPNext refuses a
+		Payment Entry for 0.00. Any other net still needs a real payout."""
+		deductions = self.deductions_to_settle(None)
+		precision = self.precision("commission_amount")
+		net = flt(flt(self.commission_amount) + sum(flt(d.commission_amount) for d in deductions), precision)
+		if not deductions or net != 0:
+			return False
+		self.flags.deductions_to_settle = deductions
+		return True
+
 	def deductions_to_settle(self, payment_entry):
 		"""Approved deductions still owed by this entry's payee (Commission Credited To, same
 		company), oldest first, that fit into what the payee receives from `payment_entry`:
 		their commission on it, this entry included, never goes below zero. Whole deductions
-		only; one that doesn't fit waits for a later payout.
+		only; one that doesn't fit waits for a later payout. With no `payment_entry`, only this
+		entry's own commission counts.
 		"""
 		if self.entry_type == DEDUCTION_TYPE or not self.commission_credited_to:
 			return []
 
 		precision = self.precision("commission_amount")
-		payee_total = frappe.db.sql(
-			"""select coalesce(sum(commission_amount), 0) from `tabSales Commission Entry`
-			where payment_entry = %s and docstatus = 1 and name != %s and commission_credited_to = %s""",
-			(payment_entry, self.name or "", self.commission_credited_to),
-		)[0][0]
+		payee_total = 0
+		if payment_entry:
+			payee_total = frappe.db.sql(
+				"""select coalesce(sum(commission_amount), 0) from `tabSales Commission Entry`
+				where payment_entry = %s and docstatus = 1 and name != %s and commission_credited_to = %s""",
+				(payment_entry, self.name or "", self.commission_credited_to),
+			)[0][0]
 		payee_total = flt(flt(payee_total) + flt(self.commission_amount), precision)
 
 		# FOR UPDATE: two payouts made at the same moment can't take off the same deduction.
-		candidates = frappe.db.sql(
-			"""select name, commission_amount from `tabSales Commission Entry`
-			where entry_type = %s and docstatus = 1 and status = %s and deduct_from_next_payout = 1
-				and company = %s and commission_credited_to = %s
-				and (payment_entry is null or payment_entry = '')
-			order by posting_date asc, name asc
-			for update""",
-			(DEDUCTION_TYPE, APPROVED_STATUS, self.company, self.commission_credited_to),
-			as_dict=True,
-		)
-		settle = []
-		for deduction in candidates:
-			after = flt(payee_total + flt(deduction.commission_amount), precision)
-			if after < 0:
-				continue
-			payee_total = after
-			settle.append(deduction)
-		return settle
+		candidates = approved_deductions(self.company, self.commission_credited_to, for_update=True)
+		return fit_deductions(payee_total, candidates, precision)
 
 	def on_update_after_submit(self):
 		self.settle_deductions()
 
 	def settle_deductions(self):
-		"""When this commission entry has just become Paid, the deductions validate_payout
-		planned for its payout are linked to the same Payment Entry and marked Paid too."""
+		"""When this commission entry has just become Paid, the deductions validate_payout (or
+		fully_offset_by_deductions) planned for it are linked to the same Payment Entry, if
+		any, and marked Paid too."""
 		before = self.get_doc_before_save()
 		if self.status != PAID_STATUS or (before and before.status == PAID_STATUS):
 			return
 		deductions = self.flags.get("deductions_to_settle") or []
+		names = ", ".join(d.name for d in deductions)
 		for row in deductions:
 			deduction = frappe.get_doc(self.doctype, row.name)
 			deduction.payment_entry = self.payment_entry
@@ -272,16 +306,27 @@ class SalesCommissionEntry(Document):
 			deduction.flags.ignore_permissions = True
 			deduction.flags[PAYOUT_NETTING_FLAG] = True
 			deduction.save(ignore_version=False)
-			deduction.add_comment(
-				"Info",
-				_("Taken off payout {0} together with commission entry {1}.").format(self.payment_entry, self.name),
-			)
-		if deductions:
+			if self.payment_entry:
+				comment = _("Taken off payout {0} together with commission entry {1}.").format(
+					self.payment_entry, self.name
+				)
+			else:
+				comment = _(
+					"Fully offset by deductions: taken off commission entry {0}, whose commission the "
+					"deductions ({1}) cancel out exactly, so no payout was made."
+				).format(self.name, names)
+			deduction.add_comment("Info", comment)
+		if not deductions:
+			return
+		if self.payment_entry:
+			self.add_comment("Info", _("Deductions taken off this payout ({0}): {1}.").format(self.payment_entry, names))
+		else:
 			self.add_comment(
 				"Info",
-				_("Deductions taken off this payout ({0}): {1}.").format(
-					self.payment_entry, ", ".join(d.name for d in deductions)
-				),
+				_(
+					"Fully offset by deductions ({0}): the commission and the deductions net to 0.00, so "
+					"it was marked Paid without a Payment Entry."
+				).format(names),
 			)
 
 	def keep_system_warning(self):

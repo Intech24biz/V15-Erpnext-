@@ -758,11 +758,12 @@ def guard_payout_cancel(doc, method=None):
 
 
 @frappe.whitelist()
-def mark_commission_entry_paid(commission_entry, payment_entry):
+def mark_commission_entry_paid(commission_entry, payment_entry=None):
 	"""Link an Approved commission entry to the Payment Entry (type Pay) that paid it out and
 	mark it Paid, in one step. The form does the same in two (pick Payment Entry, Update,
 	then Actions > Mark as Paid); either way the rules are enforced by the entry itself
 	(SalesCommissionEntry.validate_payment_link). No automatic bank-file matching.
+	`payment_entry` may be left empty only when deductions offset the commission exactly.
 	"""
 	if not (MARK_PAID_ROLES & set(frappe.get_roles())):
 		frappe.throw(
@@ -779,7 +780,7 @@ def mark_commission_entry_paid(commission_entry, payment_entry):
 		# A deduction is settled with the payee's commission (SalesCommissionEntry.settle_deductions).
 		frappe.throw(_(DEDUCTION_NOT_PAYABLE).format(entry.name))
 
-	entry.payment_entry = payment_entry
+	entry.payment_entry = payment_entry or None
 	entry.status = PAID_STATUS
 	# Explicit role check above stands in for permission enforcement here: this bypasses
 	# the base has_permission gate, which alone can't distinguish "System Manager/
@@ -789,6 +790,10 @@ def mark_commission_entry_paid(commission_entry, payment_entry):
 
 	message = _("Marked {0} as Paid.").format(entry.name)
 	deductions = entry.flags.get("deductions_to_settle") or []
-	if deductions:
+	if deductions and entry.payment_entry:
 		message += " " + _("Deductions taken off the same payout: {0}.").format(", ".join(d.name for d in deductions))
+	elif deductions:
+		message += " " + _("Fully offset by deductions {0}; no Payment Entry was needed.").format(
+			", ".join(d.name for d in deductions)
+		)
 	return {"ok": True, "message": message}

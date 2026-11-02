@@ -168,3 +168,76 @@ class TestSettledDeductionIsLocked(BluelineTestCase):
 			lambda: act(FINANCIAL_MANAGER, mark_commission_entry_paid, deduction.name, approved_payout(100).name),
 			"is a deduction",
 		)
+
+
+def unapproved_deductions(*qtys):
+	"""One unapproved Deduction per qty, all created before any is approved: building each
+	invoice marks PERSON's commission Paid, which would otherwise take off an earlier one."""
+	names = []
+	for qty in qtys:
+		[d] = entries_by_person(credit_and_return(qty), "Deduction").values()
+		names.append(d.name)
+	return names
+
+
+def credit_and_return(qty):
+	invoice = paid_invoice_with_mixed_statuses()
+	credit_note(invoice, qty=qty)
+	return invoice
+
+
+def comments(name):
+	return frappe.get_all(
+		"Comment", filters={"reference_doctype": SCE, "reference_name": name, "comment_type": "Info"}, pluck="content"
+	)
+
+
+class TestFullyOffsetByDeductions(BluelineTestCase):
+	"""ERPNext refuses a Payment Entry for 0.00, so a commission that deductions cancel out
+	exactly is marked Paid with no Payment Entry; any other net still needs one."""
+
+	def assertFullyOffset(self, commission, deductions):
+		for name in (commission, *deductions):
+			with self.subTest(entry=name):
+				e = entry(name)
+				self.assertEqual((e.status, e.payment_entry), ("Paid", None))
+				self.assertTrue(any("Fully offset by deductions" in c for c in comments(name)), comments(name))
+		still_outstanding = outstanding(entry(commission).company, entry(commission).commission_credited_to)
+		self.assertFalse(set(deductions) & set(still_outstanding), still_outstanding)
+
+	def test_net_exactly_zero_needs_no_payment_entry(self):
+		[deduction] = unapproved_deductions(1)  # -65
+		commission = next_commission(qty=1)  # 65
+		approve(deduction)
+		self.assertEqual(flt(commission.commission_amount) + flt(entry(deduction).commission_amount), 0)
+
+		result = act(FINANCIAL_MANAGER, mark_commission_entry_paid, commission.name, None)
+		self.assertIn("Fully offset by deductions", result["message"])
+		self.assertFullyOffset(commission.name, [deduction])
+
+	def test_net_just_above_zero_still_needs_a_payment_entry(self):
+		[deduction] = unapproved_deductions(1)  # -65
+		commission = next_commission(qty=1)
+		approve(deduction)
+		frappe.db.set_value(SCE, commission.name, "commission_amount", 65.01)  # net 0.01
+
+		self.assertRefused(lambda: act(FINANCIAL_MANAGER, mark_commission_entry_paid, commission.name, None), "Payment Entry")
+		self.assertEqual((entry(commission.name).status, entry(deduction).status), ("Approved", "Approved"))
+
+		act(FINANCIAL_MANAGER, mark_commission_entry_paid, commission.name, approved_payout(0.01).name)
+		self.assertEqual(entry(deduction).payment_entry, entry(commission.name).payment_entry)
+
+	def test_no_deductions_still_needs_a_payment_entry(self):
+		commission = next_commission(qty=1)
+		self.assertRefused(lambda: act(FINANCIAL_MANAGER, mark_commission_entry_paid, commission.name, None), "Payment Entry")
+		self.assertEqual(entry(commission.name).status, "Approved")
+
+	def test_several_deductions_adding_up_to_the_commission(self):
+		deductions = unapproved_deductions(1, 1)  # -65, -65
+		commission = next_commission(qty=2)  # 130
+		for name in deductions:
+			approve(name)
+
+		# The form route: Actions -> Mark as Paid with Payment Entry left empty.
+		act(FINANCIAL_MANAGER, apply_workflow, entry(commission.name).as_json(), "Mark as Paid")
+		self.assertFullyOffset(commission.name, deductions)
