@@ -96,12 +96,12 @@ class TestPostingDateGuard(BluelineTestCase):
 
 
 class TestStockAndAssetDoctypes(BluelineTestCase):
-	"""Stock Reconciliation posts on posting_date; ERPNext v15 posts an Asset Repair on its
-	completion_date and an Asset Value Adjustment's Journal Entry on its `date`."""
+	"""Stock Reconciliation posts on posting_date and an Asset Value Adjustment's Journal Entry
+	on its `date`. Asset Repair is left out: ERPNext 15.6 (production) posts it on the day it
+	is submitted, so it can't be back-dated."""
 
 	DATE_FIELDS = {
 		"Stock Reconciliation": "posting_date",
-		"Asset Repair": "completion_date",
 		"Asset Value Adjustment": "date",
 	}
 
@@ -125,21 +125,21 @@ class TestStockAndAssetDoctypes(BluelineTestCase):
 		# document of each doctype carrying the company and the date field it posts on.
 		from blueline.server_scripts.posting_date_guard import enforce_earliest_posting_date
 
-		yesterday = add_days(nowdate(), -1)
-		for doctype in ("Asset Repair", "Asset Value Adjustment"):
-			field = self.DATE_FIELDS[doctype]
-			with self.subTest(doctype=doctype):
-				doc = frappe.new_doc(doctype)
-				doc.update({"company": COMPANY, field: yesterday})
-				self.assertRefused(lambda: act(GI_TECH, enforce_earliest_posting_date, doc), REFUSED)
-				doc.set(field, nowdate())
-				act(GI_TECH, enforce_earliest_posting_date, doc)  # on the cutoff: allowed
+		doc = frappe.new_doc("Asset Value Adjustment")
+		doc.update({"company": COMPANY, "date": add_days(nowdate(), -1)})
+		self.assertRefused(lambda: act(GI_TECH, enforce_earliest_posting_date, doc), REFUSED)
+		doc.date = nowdate()
+		act(GI_TECH, enforce_earliest_posting_date, doc)  # on the cutoff: allowed
 
-	def test_a_pending_asset_repair_is_not_checked(self):
-		from blueline.server_scripts.posting_date_guard import enforce_earliest_posting_date
+	def test_asset_repair_is_not_guarded(self):
+		from blueline.server_scripts.posting_date_guard import DATE_FIELD_OVERRIDES, enforce_earliest_posting_date
 
+		guard = "blueline.server_scripts.posting_date_guard.enforce_earliest_posting_date"
+		self.assertNotIn(guard, frappe.get_hooks("doc_events").get("Asset Repair", {}).get("validate", []))
+		self.assertNotIn("Asset Repair", DATE_FIELD_OVERRIDES)
+		# A repair completed before the cut-off and submitted now posts today on 15.6: not refused.
 		doc = frappe.new_doc("Asset Repair")
-		doc.update({"company": COMPANY, "failure_date": add_days(nowdate(), -30)})  # no completion date yet
+		doc.update({"company": COMPANY, "completion_date": add_days(nowdate(), -30)})
 		act(GI_TECH, enforce_earliest_posting_date, doc)
 
 	def test_backdated_stock_reconciliation_is_refused_on_insert(self):

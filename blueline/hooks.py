@@ -165,7 +165,8 @@ doc_events = {
             "Period Closing Voucher",
             "Landed Cost Voucher",
             "Stock Reconciliation",
-            "Asset Repair",
+            # Not Asset Repair: ERPNext 15.6 (production) posts it on the day it is
+            # submitted, never on an earlier date, so there is nothing to guard.
             "Asset Value Adjustment",
         )
     },

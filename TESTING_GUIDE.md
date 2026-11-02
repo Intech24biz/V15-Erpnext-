@@ -179,7 +179,7 @@ Goal: a user restricted to one company sees only that company's configuration.
 1. As **Administrator**, in the COA console set Blueline's **Earliest Allowed Posting Date** to **today** → Save.
 2. As `tech@gen-innov.com`: new **Journal Entry** for Blueline, **Posting Date** yesterday, two lines of Rs. 1 → **Save**. **Expected:** refused — *"Journal Entry cannot be dated … for company Blueline Enterprises Pvt Ltd: postings before … are not allowed. Contact a System Manager if this document genuinely needs to be backdated."*
 3. Change the date to today → **Save**. **Expected:** saves (Draft). Delete it.
-4. Same check on a Sales Invoice (tick **Edit Posting Date and Time**) and a Petty Cash Voucher. **Expected:** the same refusal for yesterday.
+4. Same check on a Sales Invoice (tick **Edit Posting Date and Time**) and a Petty Cash Voucher. **Expected:** the same refusal for yesterday. (The guard covers 18 document types, listed in user manual 5.5. **Asset Repair is not checked**: ERPNext 15.6 posts it on the day it is submitted, so it can't post before the cut-off.)
 5. **System Manager override:** as `ceo@gen-innov.com`, save a Journal Entry dated yesterday. **Expected:** saves; the timeline shows *"Posting date override: ceo@gen-innov.com saved this Journal Entry with posting_date = … before the configured earliest allowed posting date …"*. Delete the draft.
 6. **Cleanup:** clear the Earliest Allowed Posting Date (or set the date the accountant wants) → Save.
 7. **Wrong results:** a back-dated document saves for a non–System Manager; the override leaves no comment.
