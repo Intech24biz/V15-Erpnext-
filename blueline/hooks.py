@@ -164,6 +164,9 @@ doc_events = {
             "Invoice Discounting",
             "Period Closing Voucher",
             "Landed Cost Voucher",
+            "Stock Reconciliation",
+            "Asset Repair",
+            "Asset Value Adjustment",
         )
     },
 }

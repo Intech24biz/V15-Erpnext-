@@ -13,6 +13,11 @@ DEFAULT_DATE_FIELD = "posting_date"
 # Doctypes whose relevant ledger date lives in a differently-named field.
 DATE_FIELD_OVERRIDES = {
     "Period Closing Voucher": "transaction_date",
+    # ERPNext v15 posts an Asset Repair's GL entries on its completion date (empty until the
+    # repair is done, so a pending repair isn't checked) and an Asset Value Adjustment's
+    # depreciation Journal Entry on its `date`.
+    "Asset Repair": "completion_date",
+    "Asset Value Adjustment": "date",
 }
 
 
