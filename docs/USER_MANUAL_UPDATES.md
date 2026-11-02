@@ -81,9 +81,19 @@ Notes for the editor are marked **[Editor]** and are not part of the manual.
 >
 > Commission entries never post anything to the accounts. Only the Credit Note itself changes the ledger.
 >
-> **Outstanding deductions** are listed per person at the top of the **Sales Commission Register** — whether still waiting for approval or already approved. Deductions are not included in the status totals.
+> **Outstanding deductions** are listed per person at the top of the **Sales Commission Register**, in three columns:
 >
-> **Deductions come off the next payout by themselves.** Once a deduction is Approved, the next time one of that person's commission entries is marked Paid (section 3.4), the system takes the deduction off the same payout: it is marked **Paid** with the same Payment Entry, and it leaves the Outstanding Deductions list. So the payout only has to cover the commission *minus* the deduction. A person never goes below zero on a payout: a deduction larger than what they receive from it waits until enough of their commission is on a payout. A deduction can't be marked Paid by hand, and once it has been taken off a payout, the Credit Note that created it can no longer be cancelled.
+> - **Awaiting Approval (won't come off yet)** — not yet signed off by two people; nothing takes these off a payout.
+> - **Comes Off Next Payout** — Approved, and they fit into the person's Approved commission that is waiting to be paid (shown under their name as *Approved commission*), if all of it is paid out on one payout.
+> - **Approved, Too Large to Fit Yet** — Approved, but they don't fit into that commission; they wait until there is enough.
+>
+> Each deduction entry is labelled with its column. Deductions are not included in the status totals.
+>
+> **Deductions come off the next payout by themselves.** When one of a person's commission entries is marked Paid (section 3.4), the system goes through that person's **Approved** deductions for the same company, **oldest first** (by date, then entry number), and takes each one off **whole** if it fits: the person's commission on that payout, less the deductions already taken off, must not go below zero. A deduction that doesn't fit is **skipped** — it stays Approved and waits for a later payout — and the system carries on with the next one, so a **later, smaller deduction can come off before an older, larger one**. Deductions still awaiting approval are never taken off. Each deduction taken off is marked **Paid** with the same Payment Entry and leaves the Outstanding Deductions list.
+>
+> **When the deductions cancel the commission exactly.** If the deductions taken off add up to exactly the commission (net 0.00), there is nothing to pay out — and ERPNext can't record a payment of 0.00. Leave **Payment Entry** empty and use **Actions → Mark as Paid**: the commission entry and the deductions are all marked **Paid** with no Payment Entry, and each one's timeline says *"Fully offset by deductions …"*. In every other case a Payment Entry is required.
+>
+> A deduction can't be marked Paid by hand, and once it has been taken off, the Credit Note that created it can no longer be cancelled.
 >
 > If the commission can't be adjusted for some reason, the Credit Note is **not approved**. The approver sees *"Commission could not be adjusted for this Credit Note; nothing was changed. Contact the administrator."* Nothing has changed — not the Credit Note, not the accounts, not the commission — so the administrator can fix the cause and the Credit Note can then be approved as normal.
 
@@ -135,7 +145,13 @@ Notes for the editor are marked **[Editor]** and are not part of the manual.
 >
 > One payout can cover several commission entries, as long as their commission adds up to no more than the amount the payout paid; the entry that would go over is refused. Once an entry is Paid, its Payment Entry can't be changed by anyone, and the payout can't be cancelled while Paid entries point to it.
 >
-> **Deductions** (3.2a): when you mark an entry Paid, any Approved deductions for the same person are taken off the same payout automatically, so record the payout for the commission **minus** those deductions. The register's Outstanding Deductions list shows what will come off. The confirmation after Mark as Paid names the deductions that were taken off.
+> **Deductions** (3.2a): when you mark an entry Paid, the person's Approved deductions that fit are taken off the same payout automatically (oldest first; one that doesn't fit is skipped and a later one may still be taken), so record the payout for the commission **minus** the deductions that will come off.
+>
+> To know that amount, use the register's **Comes Off Next Payout** column, not the whole Outstanding Deductions list: deductions *Awaiting Approval* or *Too Large to Fit Yet* will **not** come off. The column assumes all of the person's Approved commission is paid on **one** payout. If you pay their entries on separate payouts, each Mark as Paid only fits deductions into the commission on that payout, so less may come off at a time.
+>
+> If the payout turns out smaller than the commission minus what actually comes off, Mark as Paid is refused (*"… more than was paid"*) and nothing changes. The confirmation after Mark as Paid names the deductions that were taken off.
+>
+> **Nothing to pay (net 0.00):** if the deductions that come off equal the commission exactly, skip step 1 — leave **Payment Entry** empty and use **Actions → Mark as Paid** (3.2a). Any other amount needs a Payment Entry.
 
 **[Editor]** The company needs a Payable account to pay commission from (for example *Commission payable*); the accountant sets this up once.
 
@@ -274,7 +290,7 @@ Notes for the editor are marked **[Editor]** and are not part of the manual.
 | I tried to approve a commission entry and got "This commission cannot be approved while the invoice still has an outstanding amount." | The customer hasn't paid the invoice in full yet (or a payment was cancelled). Approve it once the invoice shows nothing outstanding — after the remaining payment, or after a Credit Note is applied to it. |
 | Mark as Paid says "Select the Payment Entry that paid this commission out". | Record the payout first (Payment Entry, type Pay, approved), choose it in the entry's **Payment Entry** field, click **Update**, then Mark as Paid. |
 | A commission entry shows a red Payment Warning. What do I do? | A payment on its invoice was cancelled after the entry was ticked or approved. Don't pay that commission until the invoice is fully paid again; the warning then disappears by itself. |
-| A customer returned goods after the commission was paid. Do I have to fix the commission? | No. Approving the Credit Note creates a Deduction entry for that person automatically. Once it is approved, it comes off their next payout by itself when their next commission entry is marked Paid. Until then it is listed under Outstanding Deductions on the Sales Commission Register. |
+| A customer returned goods after the commission was paid. Do I have to fix the commission? | No. Approving the Credit Note creates a Deduction entry for that person automatically. Once it is approved, it comes off by itself when one of their commission entries is marked Paid, as soon as it fits into the commission on that payout (3.2a). Until then it is listed under Outstanding Deductions on the Sales Commission Register, in the column that says whether it will come off next. |
 
 ---
 
