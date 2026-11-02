@@ -14,7 +14,9 @@ required_apps = ["erpnext"]
 # Frappe re-imports fixtures with force=True on every bench migrate, which put back the
 # shipped approver roles over any change a System Manager had made on site. They are
 # seeded from blueline/setup_data/ by setup.after_migrate, insert-only. To change them on
-# an existing site, use the Workflow / Notification screen (or a patch), not those files.
+# an existing site, use the Workflow / Notification screen (or a patch), not those files,
+# then bring the change back into git with workflow_sync.export_snapshot (see
+# docs/WORKFLOW_CHANGES.md).
 fixtures = [
     {"doctype": "Custom Field", "filters": [["module", "=", "Blueline"]]},
     {
@@ -54,6 +56,11 @@ fixtures = [
     {"doctype": "Workspace", "filters": [["name", "=", "Blueline Control Center"]]},
 ]
 
+# Company COA Configuration.earliest_allowed_posting_date, enforced server-side on `validate`
+# of every doctype that posts to a company's general or stock ledger (so it holds for the
+# form, the REST API, imports and scripts alike). See posting_date_guard.py.
+POSTING_DATE_GUARD = "blueline.server_scripts.posting_date_guard.enforce_earliest_posting_date"
+
 doc_events = {
     "Workflow": {
         "validate": "blueline.server_scripts.workflow_guard.only_system_manager",
@@ -78,6 +85,7 @@ doc_events = {
         "validate": [
             "blueline.server_scripts.self_approval.record_sender",
             "blueline.server_scripts.tax_invoice_serial.validate_serial_and_series",
+            POSTING_DATE_GUARD,
         ],
         "before_submit": [
             "blueline.server_scripts.self_approval.block_self_approval",
@@ -94,14 +102,15 @@ doc_events = {
             # commission guard still covers invoices that never received a serial.
             "blueline.server_scripts.tax_invoice_serial.block_cancel_of_tax_invoice",
             "blueline.server_scripts.sales_commission.guard_commission_entries_on_cancel",
+            "blueline.server_scripts.sales_commission.guard_settled_deductions_on_cancel",
         ],
     },
     "Petty Cash Voucher": {
-        "validate": "blueline.server_scripts.self_approval.record_sender",
+        "validate": ["blueline.server_scripts.self_approval.record_sender", POSTING_DATE_GUARD],
         "before_submit": "blueline.server_scripts.self_approval.block_self_approval",
     },
     "Payment Entry": {
-        "validate": "blueline.server_scripts.self_approval.record_sender",
+        "validate": ["blueline.server_scripts.self_approval.record_sender", POSTING_DATE_GUARD],
         "before_submit": [
             "blueline.server_scripts.self_approval.block_self_approval",
             "blueline.server_scripts.approval_enforcement.enforce_approval",
@@ -117,6 +126,7 @@ doc_events = {
     },
     # Commission is released when an invoice's outstanding reaches zero by any route.
     "Journal Entry": {
+        "validate": POSTING_DATE_GUARD,
         "on_submit": "blueline.server_scripts.sales_commission.release_on_journal_entry",
         "on_cancel": "blueline.server_scripts.sales_commission.reopen_on_journal_cancel",
     },
@@ -129,7 +139,37 @@ doc_events = {
     "Customer": {
         "after_insert": "blueline.server_scripts.customer_master.save_customer_tin",
         "on_update": "blueline.server_scripts.customer_master.save_customer_tin",
-    }
+    },
+    # Document storage by fiscal year (see document_folders.py).
+    "Fiscal Year": {
+        "after_insert": "blueline.document_folders.on_fiscal_year_insert",
+    },
+    "File": {
+        "before_insert": "blueline.document_folders.file_attachment",
+    },
+    # The remaining ledger-posting doctypes (Sales Invoice, Payment Entry, Journal Entry and
+    # Petty Cash Voucher carry the guard in their own entries above).
+    **{
+        doctype: {"validate": POSTING_DATE_GUARD}
+        for doctype in (
+            "Purchase Invoice",
+            "Stock Entry",
+            "Delivery Note",
+            "Purchase Receipt",
+            "POS Invoice",
+            "POS Closing Entry",
+            "Subcontracting Receipt",
+            "Asset Capitalization",
+            "Exchange Rate Revaluation",
+            "Invoice Discounting",
+            "Period Closing Voucher",
+            "Landed Cost Voucher",
+            "Stock Reconciliation",
+            # Not Asset Repair: ERPNext 15.6 (production) posts it on the day it is
+            # submitted, never on an earlier date, so there is nothing to guard.
+            "Asset Value Adjustment",
+        )
+    },
 }
 
 after_install = "blueline.setup.after_install"

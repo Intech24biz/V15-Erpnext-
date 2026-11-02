@@ -1,6 +1,8 @@
 import frappe
 from frappe import _
-from frappe.utils import getdate
+from frappe.utils import flt, getdate
+
+from blueline.blueline.doctype.sales_commission_entry.sales_commission_entry import APPROVED_STATUS, fit_deductions
 
 DOCTYPE = "Sales Commission Entry"
 
@@ -36,8 +38,8 @@ STATUS_OPTIONS = [
 ]
 
 DEDUCTION_TYPE = "Deduction"
-# Paid can't happen to a deduction today (Mark as Paid refuses it); listed so that netting,
-# once built, closes a deduction by marking it Paid without changing this page.
+# A deduction becomes Paid when it is taken off a payout with the payee's commission
+# (SalesCommissionEntry.settle_deductions); it then leaves the outstanding list.
 SETTLED_DEDUCTION_STATUSES = ["Paid", "Cancelled"]
 
 
@@ -103,7 +105,15 @@ def get_entries(
 
 def get_outstanding_deductions(matched_sales_person=None, commission_credited_to=None, company=None):
 	"""Per person (Commission Credited To — who receives the payout): Deduction entries still
-	to be taken off a payout. A balance, so the status and date filters don't apply."""
+	to be taken off a payout. A balance, so the status and date filters don't apply.
+
+	Each person's deductions are split three ways (`bucket` on each entry):
+	- awaiting_approval: not Approved yet, so nothing takes them off;
+	- next_payout: Approved, and they fit into the person's Approved commission that is
+	  waiting to be paid, if it is all paid out on one payout;
+	- too_large: Approved, but they don't fit into that commission yet and wait for more.
+	The split uses the same rule as Mark as Paid (fit_deductions: oldest first, whole ones
+	only, never below zero, one that doesn't fit is skipped)."""
 	filters = {
 		"entry_type": DEDUCTION_TYPE,
 		"deduct_from_next_payout": 1,
@@ -120,16 +130,60 @@ def get_outstanding_deductions(matched_sales_person=None, commission_credited_to
 	rows = frappe.get_list(
 		DOCTYPE,
 		filters=filters,
-		fields=["name", "commission_credited_to", "company", "commission_amount", "status", "credit_note"],
-		order_by="commission_credited_to asc, name asc",
+		fields=["name", "commission_credited_to", "company", "commission_amount", "status", "credit_note", "posting_date"],
+		order_by="commission_credited_to asc, posting_date asc, name asc",
 		limit_page_length=0,
 	)
 	by_person = {}
 	for row in rows:
 		person = by_person.setdefault(
 			(row.commission_credited_to, row.company),
-			{"commission_credited_to": row.commission_credited_to, "company": row.company, "amount": 0.0, "entries": []},
+			{
+				"commission_credited_to": row.commission_credited_to,
+				"company": row.company,
+				"amount": 0.0,
+				"awaiting_approval_amount": 0.0,
+				"next_payout_amount": 0.0,
+				"too_large_amount": 0.0,
+				"approved_commission": 0.0,
+				"entries": [],
+				"rows": [],
+			},
 		)
 		person["amount"] += row.commission_amount or 0.0
-		person["entries"].append({"name": row.name, "status": row.status, "credit_note": row.credit_note})
+		person["rows"].append(row)
+
+	precision = frappe.get_precision(DOCTYPE, "commission_amount")
+	for (payee, payee_company), person in by_person.items():
+		person["approved_commission"] = waiting_commission(payee, payee_company)
+		approved = [r for r in person["rows"] if r.status == APPROVED_STATUS]
+		taken = {d.name for d in fit_deductions(person["approved_commission"], approved, precision)}
+		for row in person.pop("rows"):
+			if row.status != APPROVED_STATUS:
+				bucket = "awaiting_approval"
+			elif row.name in taken:
+				bucket = "next_payout"
+			else:
+				bucket = "too_large"
+			person[f"{bucket}_amount"] += row.commission_amount or 0.0
+			person["entries"].append(
+				{"name": row.name, "status": row.status, "credit_note": row.credit_note, "bucket": bucket}
+			)
 	return list(by_person.values())
+
+
+def waiting_commission(commission_credited_to, company):
+	"""The person's Approved commission not yet paid out: what their next payout covers."""
+	rows = frappe.get_list(
+		DOCTYPE,
+		filters={
+			"entry_type": ["!=", DEDUCTION_TYPE],
+			"docstatus": 1,
+			"status": APPROVED_STATUS,
+			"commission_credited_to": commission_credited_to,
+			"company": company,
+		},
+		fields=["commission_amount"],
+		limit_page_length=0,
+	)
+	return sum(flt(r.commission_amount) for r in rows)

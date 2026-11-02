@@ -1,0 +1,56 @@
+# Static checks on every push and pull request. They need no Frappe site.
+#
+# The behaviour suites (blueline/tests, 100+ tests) run against a site holding the client's
+# copied business data — real customers, users, items and commission rules — and roll every
+# change back. They can't run here until an anonymised dataset exists; run them on staging
+# before each deploy instead:
+#
+#   bench --site <staging-site> execute blueline.tests.runner.run
+
+name: Checks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Python compiles
+        run: python -m compileall -q blueline
+
+      - name: JSON files parse (doctypes, pages, fixtures, seed data)
+        run: |
+          find blueline -name '*.json' -print0 | xargs -0 -n1 python -c 'import json, sys; json.load(open(sys.argv[1]))'
+
+      - name: JavaScript parses
+        run: |
+          find blueline -name '*.js' -print0 | xargs -0 -n1 node --check
+
+      - name: Every suite in the test runner exists
+        run: |
+          python - <<'PY'
+          import ast, pathlib
+          tree = ast.parse(pathlib.Path("blueline/tests/runner.py").read_text())
+          suites = next(
+              node.value.elts for node in tree.body
+              if isinstance(node, ast.Assign) and getattr(node.targets[0], "id", "") == "SUITES"
+          )
+          missing = [s.value for s in suites if not pathlib.Path(f"blueline/tests/{s.value}.py").exists()]
+          tests = sorted(p.stem for p in pathlib.Path("blueline/tests").glob("test_*.py"))
+          unlisted = [t for t in tests if t not in {s.value for s in suites}]
+          assert not missing, f"listed in runner.SUITES but missing: {missing}"
+          assert not unlisted, f"test files not listed in runner.SUITES (they would never run): {unlisted}"
+          print(f"{len(tests)} suites listed and present")
+          PY

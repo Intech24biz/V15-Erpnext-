@@ -174,20 +174,33 @@ blueline.SalesCommissionRegister = class SalesCommissionRegister {
 			return;
 		}
 
+		// The three columns follow get_outstanding_deductions(): only "Comes off next payout"
+		// is what Mark as Paid will take off.
+		const bucket_labels = {
+			awaiting_approval: __("awaiting approval"),
+			next_payout: __("comes off next payout"),
+			too_large: __("too large to fit yet"),
+		};
 		const table = $(`
 			<div>
-				<div class="scr-section-title">${__("Outstanding Deductions (deduct from next payout)")}</div>
+				<div class="scr-section-title">${__("Outstanding Deductions")}</div>
 				<table class="table table-bordered">
 					<thead>
 						<tr>
 							<th>${__("Credited To")}</th>
 							<th>${__("Company")}</th>
-							<th class="text-right">${__("Amount to Deduct")}</th>
+							<th class="text-right">${__("Awaiting Approval (won't come off yet)")}</th>
+							<th class="text-right">${__("Comes Off Next Payout")}</th>
+							<th class="text-right">${__("Approved, Too Large to Fit Yet")}</th>
 							<th>${__("Deduction Entries")}</th>
 						</tr>
 					</thead>
 					<tbody></tbody>
 				</table>
+				<div class="scr-original">${__(
+					"Comes Off Next Payout: approved deductions that fit, oldest first, into this person's Approved commission waiting to be paid ({0} shown per row), if it is all paid on one payout. A deduction that doesn't fit is skipped and waits; a later, smaller one can still come off.",
+					[__("Approved commission")]
+				)}</div>
 			</div>
 		`).appendTo($el);
 		const $tbody = table.find("tbody");
@@ -196,14 +209,18 @@ blueline.SalesCommissionRegister = class SalesCommissionRegister {
 			const links = row.entries
 				.map(
 					(e) =>
-						`<a href="/app/sales-commission-entry/${encodeURIComponent(e.name)}">${frappe.utils.escape_html(e.name)}</a> ${this.status_badge(e.status)}`
+						`<a href="/app/sales-commission-entry/${encodeURIComponent(e.name)}">${frappe.utils.escape_html(e.name)}</a> ${this.status_badge(e.status)} <span class="scr-original">${bucket_labels[e.bucket] || ""}</span>`
 				)
 				.join("<br>");
 			$(`
 				<tr>
-					<td>${frappe.utils.escape_html(row.commission_credited_to || "")}</td>
+					<td>${frappe.utils.escape_html(row.commission_credited_to || "")}
+						<div class="scr-original">${__("Approved commission")}: ${format_currency(row.approved_commission, currency)}</div>
+					</td>
 					<td>${frappe.utils.escape_html(row.company || "")}</td>
-					<td class="text-right">${format_currency(-row.amount, currency)}</td>
+					<td class="text-right">${format_currency(-row.awaiting_approval_amount, currency)}</td>
+					<td class="text-right">${format_currency(-row.next_payout_amount, currency)}</td>
+					<td class="text-right">${format_currency(-row.too_large_amount, currency)}</td>
 					<td>${links}</td>
 				</tr>
 			`).appendTo($tbody);

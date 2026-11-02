@@ -612,6 +612,32 @@ def _create_deduction(entry, credit_note, returned_amount, amount):
 	return deduction
 
 
+def guard_settled_deductions_on_cancel(doc, method=None):
+	"""Sales Invoice `before_cancel`: a deduction already taken off a payout is money withheld
+	from the payee; cancelling its Credit Note would cancel it and leave that payout's
+	commission unbalanced. Refused before anything is written."""
+	if not doc.get("is_return"):
+		return
+	settled = frappe.get_all(
+		ENTRY_DOCTYPE,
+		filters={"credit_note": doc.name, "entry_type": DEDUCTION_TYPE, "docstatus": 1, "status": PAID_STATUS},
+		fields=["name", "payment_entry"],
+		order_by="name asc",
+	)
+	if settled:
+		frappe.throw(
+			_(
+				"Credit Note {0} can't be cancelled: its commission deductions {1} have already been "
+				"taken off a payout ({2})."
+			).format(
+				frappe.bold(doc.name),
+				", ".join(d.name for d in settled),
+				", ".join(sorted({d.payment_entry for d in settled if d.payment_entry})),
+			),
+			title=_("Commission Deduction Settled"),
+		)
+
+
 def reverse_credit_note(doc, method=None):
 	"""Sales Invoice `on_cancel`: a cancelled Credit Note gives back exactly what it took —
 	reduced amounts are restored, entries it cancelled return to their previous status,
@@ -732,11 +758,12 @@ def guard_payout_cancel(doc, method=None):
 
 
 @frappe.whitelist()
-def mark_commission_entry_paid(commission_entry, payment_entry):
+def mark_commission_entry_paid(commission_entry, payment_entry=None):
 	"""Link an Approved commission entry to the Payment Entry (type Pay) that paid it out and
 	mark it Paid, in one step. The form does the same in two (pick Payment Entry, Update,
 	then Actions > Mark as Paid); either way the rules are enforced by the entry itself
 	(SalesCommissionEntry.validate_payment_link). No automatic bank-file matching.
+	`payment_entry` may be left empty only when deductions offset the commission exactly.
 	"""
 	if not (MARK_PAID_ROLES & set(frappe.get_roles())):
 		frappe.throw(
@@ -750,10 +777,10 @@ def mark_commission_entry_paid(commission_entry, payment_entry):
 		frappe.throw(_("Only an Approved commission entry can be marked as Paid."))
 
 	if entry.entry_type == DEDUCTION_TYPE:
-		# A deduction is settled by netting it off a later payout, which is not built yet.
+		# A deduction is settled with the payee's commission (SalesCommissionEntry.settle_deductions).
 		frappe.throw(_(DEDUCTION_NOT_PAYABLE).format(entry.name))
 
-	entry.payment_entry = payment_entry
+	entry.payment_entry = payment_entry or None
 	entry.status = PAID_STATUS
 	# Explicit role check above stands in for permission enforcement here: this bypasses
 	# the base has_permission gate, which alone can't distinguish "System Manager/
@@ -761,4 +788,12 @@ def mark_commission_entry_paid(commission_entry, payment_entry):
 	entry.flags.ignore_permissions = True
 	entry.save()
 
-	return {"ok": True, "message": _("Marked {0} as Paid.").format(entry.name)}
+	message = _("Marked {0} as Paid.").format(entry.name)
+	deductions = entry.flags.get("deductions_to_settle") or []
+	if deductions and entry.payment_entry:
+		message += " " + _("Deductions taken off the same payout: {0}.").format(", ".join(d.name for d in deductions))
+	elif deductions:
+		message += " " + _("Fully offset by deductions {0}; no Payment Entry was needed.").format(
+			", ".join(d.name for d in deductions)
+		)
+	return {"ok": True, "message": message}

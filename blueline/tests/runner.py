@@ -24,9 +24,15 @@ SUITES = (
 	"test_commission_release",
 	"test_unpaid_guard",
 	"test_mark_as_paid",
+	"test_deduction_netting",
 	"test_approver_roles",
 	"test_item5_commission_matching",
 	"test_coa_valuation_method",
+	"test_vat_discrepancies",
+	"test_posting_date_guard",
+	"test_workflow_sync",
+	"test_kpi_dashboards",
+	"test_document_folders",
 )
 
 

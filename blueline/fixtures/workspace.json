@@ -1,7 +1,7 @@
 [
  {
   "charts": [],
-  "content": "[{\"data\":{\"col\":12,\"text\":\"<span class=\\\"h4\\\"><b>Approvals & Transactions</b></span>\"},\"id\":\"6a7d19b21d\",\"type\":\"header\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Quotation\"},\"id\":\"169ab3951b\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Purchase Order\"},\"id\":\"8845fd0ef2\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Sales Invoice\"},\"id\":\"968c61e167\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Payment Entry\"},\"id\":\"4cdacf1413\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Petty Cash Voucher\"},\"id\":\"4d51e7753d\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Journal Entry\"},\"id\":\"76a2edc2c3\",\"type\":\"shortcut\"},{\"data\":{\"col\":12},\"id\":\"4716395f72\",\"type\":\"spacer\"},{\"data\":{\"col\":12,\"text\":\"<span class=\\\"h4\\\"><b>Sales & Commission</b></span>\"},\"id\":\"8ac806f882\",\"type\":\"header\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Sales Commission Register\"},\"id\":\"256f59e3fb\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Sales Commission Rule\"},\"id\":\"625f4cabd0\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Sales Commission Entry\"},\"id\":\"7c34c83252\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Sales Person\"},\"id\":\"de35f5356d\",\"type\":\"shortcut\"},{\"data\":{\"col\":12},\"id\":\"f76dd9524c\",\"type\":\"spacer\"},{\"data\":{\"col\":12,\"text\":\"<span class=\\\"h4\\\"><b>Master Data</b></span>\"},\"id\":\"38c9716215\",\"type\":\"header\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Customer\"},\"id\":\"3eb3123197\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Supplier\"},\"id\":\"e2d1254cec\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Item\"},\"id\":\"61d6baf467\",\"type\":\"shortcut\"},{\"data\":{\"col\":12},\"id\":\"0cdc73c211\",\"type\":\"spacer\"},{\"data\":{\"col\":12,\"text\":\"<span class=\\\"h4\\\"><b>Reporting</b></span>\"},\"id\":\"ce069419cb\",\"type\":\"header\"},{\"data\":{\"col\":3,\"shortcut_name\":\"VAT Dashboard\"},\"id\":\"80d15df03c\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Quotation Analytics Dashboard\"},\"id\":\"f56a5c0bf0\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Quotation History\"},\"id\":\"a7ae6230cc\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Error Log\"},\"id\":\"8e36bb2cf0\",\"type\":\"shortcut\"},{\"data\":{\"col\":12},\"id\":\"9d9fe43b59\",\"type\":\"spacer\"},{\"data\":{\"col\":12,\"text\":\"<span class=\\\"h4\\\"><b>Setup / Config</b></span>\"},\"id\":\"b1c7a200d4\",\"type\":\"header\"},{\"data\":{\"col\":3,\"shortcut_name\":\"COA Mapping Console\"},\"id\":\"d7de69362c\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Company COA Configuration\"},\"id\":\"a133305602\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Company\"},\"id\":\"1a8176589c\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Chart of Accounts\"},\"id\":\"a449957165\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Cost Center\"},\"id\":\"c7d859cf8b\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Warehouse\"},\"id\":\"4a61a9ae8a\",\"type\":\"shortcut\"},{\"data\":{\"col\":12},\"id\":\"e4e04175e0\",\"type\":\"spacer\"},{\"data\":{\"col\":12,\"text\":\"<span class=\\\"h4\\\"><b>Users & Access</b></span>\"},\"id\":\"56015bdc7d\",\"type\":\"header\"},{\"data\":{\"col\":3,\"shortcut_name\":\"User\"},\"id\":\"d3ca1fe62c\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Role\"},\"id\":\"bd5be5c7bf\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"User Permission\"},\"id\":\"2f3bb20092\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Workflow\"},\"id\":\"7e9ab74955\",\"type\":\"shortcut\"},{\"data\":{\"col\":12},\"id\":\"f1af0db786\",\"type\":\"spacer\"},{\"data\":{\"col\":12,\"text\":\"<span class=\\\"h4\\\"><b>Links</b></span>\"},\"id\":\"10263bbe76\",\"type\":\"header\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Blueline GitHub Repository\"},\"id\":\"7df1de8089\",\"type\":\"shortcut\"}]",
+  "content": "[{\"data\":{\"col\":12,\"text\":\"<span class=\\\"h4\\\"><b>Dashboards</b></span>\"},\"id\":\"bl0dash001\",\"type\":\"header\"},{\"data\":{\"col\":3,\"shortcut_name\":\"My Dashboard\"},\"id\":\"bl0dash002\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Business KPI Dashboard\"},\"id\":\"bl0dash003\",\"type\":\"shortcut\"},{\"data\":{\"col\":12},\"id\":\"bl0dash004\",\"type\":\"spacer\"},{\"data\":{\"col\":12,\"text\":\"<span class=\\\"h4\\\"><b>Approvals & Transactions</b></span>\"},\"id\":\"6a7d19b21d\",\"type\":\"header\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Quotation\"},\"id\":\"169ab3951b\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Purchase Order\"},\"id\":\"8845fd0ef2\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Sales Invoice\"},\"id\":\"968c61e167\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Payment Entry\"},\"id\":\"4cdacf1413\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Petty Cash Voucher\"},\"id\":\"4d51e7753d\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Journal Entry\"},\"id\":\"76a2edc2c3\",\"type\":\"shortcut\"},{\"data\":{\"col\":12},\"id\":\"4716395f72\",\"type\":\"spacer\"},{\"data\":{\"col\":12,\"text\":\"<span class=\\\"h4\\\"><b>Sales & Commission</b></span>\"},\"id\":\"8ac806f882\",\"type\":\"header\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Sales Commission Register\"},\"id\":\"256f59e3fb\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Sales Commission Rule\"},\"id\":\"625f4cabd0\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Sales Commission Entry\"},\"id\":\"7c34c83252\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Sales Person\"},\"id\":\"de35f5356d\",\"type\":\"shortcut\"},{\"data\":{\"col\":12},\"id\":\"f76dd9524c\",\"type\":\"spacer\"},{\"data\":{\"col\":12,\"text\":\"<span class=\\\"h4\\\"><b>Master Data</b></span>\"},\"id\":\"38c9716215\",\"type\":\"header\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Customer\"},\"id\":\"3eb3123197\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Supplier\"},\"id\":\"e2d1254cec\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Item\"},\"id\":\"61d6baf467\",\"type\":\"shortcut\"},{\"data\":{\"col\":12},\"id\":\"0cdc73c211\",\"type\":\"spacer\"},{\"data\":{\"col\":12,\"text\":\"<span class=\\\"h4\\\"><b>Reporting</b></span>\"},\"id\":\"ce069419cb\",\"type\":\"header\"},{\"data\":{\"col\":3,\"shortcut_name\":\"VAT Dashboard\"},\"id\":\"80d15df03c\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Quotation Analytics Dashboard\"},\"id\":\"f56a5c0bf0\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Quotation History\"},\"id\":\"a7ae6230cc\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Error Log\"},\"id\":\"8e36bb2cf0\",\"type\":\"shortcut\"},{\"data\":{\"col\":12},\"id\":\"9d9fe43b59\",\"type\":\"spacer\"},{\"data\":{\"col\":12,\"text\":\"<span class=\\\"h4\\\"><b>Setup / Config</b></span>\"},\"id\":\"b1c7a200d4\",\"type\":\"header\"},{\"data\":{\"col\":3,\"shortcut_name\":\"COA Mapping Console\"},\"id\":\"d7de69362c\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Company COA Configuration\"},\"id\":\"a133305602\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Company\"},\"id\":\"1a8176589c\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Chart of Accounts\"},\"id\":\"a449957165\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Cost Center\"},\"id\":\"c7d859cf8b\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Warehouse\"},\"id\":\"4a61a9ae8a\",\"type\":\"shortcut\"},{\"data\":{\"col\":12},\"id\":\"e4e04175e0\",\"type\":\"spacer\"},{\"data\":{\"col\":12,\"text\":\"<span class=\\\"h4\\\"><b>Users & Access</b></span>\"},\"id\":\"56015bdc7d\",\"type\":\"header\"},{\"data\":{\"col\":3,\"shortcut_name\":\"User\"},\"id\":\"d3ca1fe62c\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Role\"},\"id\":\"bd5be5c7bf\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"User Permission\"},\"id\":\"2f3bb20092\",\"type\":\"shortcut\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Workflow\"},\"id\":\"7e9ab74955\",\"type\":\"shortcut\"},{\"data\":{\"col\":12},\"id\":\"f1af0db786\",\"type\":\"spacer\"},{\"data\":{\"col\":12,\"text\":\"<span class=\\\"h4\\\"><b>Links</b></span>\"},\"id\":\"10263bbe76\",\"type\":\"header\"},{\"data\":{\"col\":3,\"shortcut_name\":\"Blueline GitHub Repository\"},\"id\":\"7df1de8089\",\"type\":\"shortcut\"}]",
   "custom_blocks": [],
   "docstatus": 0,
   "doctype": "Workspace",
@@ -23,6 +23,40 @@
   "roles": [],
   "sequence_id": 33.0,
   "shortcuts": [
+   {
+    "color": null,
+    "doc_view": "",
+    "format": null,
+    "icon": null,
+    "kanban_board": null,
+    "label": "Business KPI Dashboard",
+    "link_to": "business-kpi-dashboard",
+    "parent": "Blueline Control Center",
+    "parentfield": "shortcuts",
+    "parenttype": "Workspace",
+    "report_ref_doctype": null,
+    "restrict_to_domain": null,
+    "stats_filter": null,
+    "type": "Page",
+    "url": null
+   },
+   {
+    "color": null,
+    "doc_view": "",
+    "format": null,
+    "icon": null,
+    "kanban_board": null,
+    "label": "My Dashboard",
+    "link_to": "my-dashboard",
+    "parent": "Blueline Control Center",
+    "parentfield": "shortcuts",
+    "parenttype": "Workspace",
+    "report_ref_doctype": null,
+    "restrict_to_domain": null,
+    "stats_filter": null,
+    "type": "Page",
+    "url": null
+   },
    {
     "color": null,
     "doc_view": "",

@@ -71,9 +71,9 @@ _K1 (Financial Manager's "Mark as Paid" silently failing) and K2 (wrong-role app
 | K10 | **"Approve" is still shown** in the Actions menu to the creator / sender of a document. Clicking it is refused with *"You cannot approve a document you created or sent for approval."* — the block is enforced on the server, the button is not hidden. | Sections 3.6, 3.7 |
 | ~~K11~~ | **Resolved (2026-10-29 branch).** A Credit Note now adjusts the original invoice's commission entries instead of creating negative Accrued entries — see 2.9. | Sections 2.8, 2.9, 3.7 |
 | K12 | **An approved Credit Note can still be cancelled** (it has no Tax Invoice Serial, so the cancel block doesn't apply to it). Pending client confirmation. Cancelling it now also restores the commission it adjusted (2.9 E). | Sections 2.9, 3.7 |
-| K13 | **Deduction entries have no payout step yet.** A Deduction is created in **Payment Received - Pending Approval** and is approved like any commission entry (two different people). After that it stays **Approved**: **Mark as Paid** refuses it, and it shows as outstanding on the Sales Commission Register until netting against a payout is built. | Section 2.9 |
+| ~~K13~~ | **Resolved (branch `feature/commission-deduction-netting`).** An Approved Deduction is taken off the payee's next payout automatically when one of their commission entries is marked Paid — see 2.9 D2. | Section 2.9 |
 | K7 | **The VAT Dashboard page does not show the list of VAT accounts** — only totals, a chart and a monthly table. To see which accounts it uses, use the read-only URL in Section 5.4. | Section 5 |
-| K8 | **"Earliest Allowed Posting Date" on the COA configuration is not enforced yet** (that guard is not deployed). You can fill it in, but nothing will block back-dated postings. Don't test enforcement. | Section 1 |
+| ~~K8~~ | **Resolved (branch `feature/posting-date-guard-v2`).** "Earliest Allowed Posting Date" is enforced on the server for every ledger-posting document — see 1.6. | Section 1 |
 | K9 | **Blueline Enterprises has no default cash/bank account set**, so on Payment Entries you must pick "Account Paid To" by hand. (Filling "Default Cash Account" in the COA console is part of the long-term fix.) | Sections 2, 3 |
 
 ### 0.6 Where everything lives
@@ -123,7 +123,7 @@ The console itself has **no "create" button** — new configurations are created
    | Multi-Currency | Exchange Gain/Loss Account | that company's exchange gain/loss account |
    | | Foreign Currency Revaluation Account | optional |
    | | Inter Company Clearing Account | optional |
-   | Guardrail | Earliest Allowed Posting Date | optional — **not enforced yet (K8)** |
+   | Guardrail | Earliest Allowed Posting Date | optional — leave empty here; tested in 1.6 |
 
 3. Click **Save** (or Ctrl+S).
 4. **Expected:** "Saved" toast; the record name becomes the company name.
@@ -173,6 +173,16 @@ Goal: a user restricted to one company sees only that company's configuration.
 5. As Administrator, edit that User Permission → change **For Value** to the company you configured → Save.
 6. As `coa.test@...` → **Refresh** the console. **Expected:** that one company's panel, **"Read-only"** badge (they have no Financial Manager role), no Save.
 7. **Cleanup:** delete the User Permission (`/app/user-permission`, filter by user → open → ⋯ → Delete), then disable the test user (open user → untick **Enabled** → Save) or delete it.
+
+### 1.6 Earliest Allowed Posting Date — [REVERSIBLE: drafts only, deleted afterwards; set the date back to empty at the end]
+
+1. As **Administrator**, in the COA console set Blueline's **Earliest Allowed Posting Date** to **today** → Save.
+2. As `tech@gen-innov.com`: new **Journal Entry** for Blueline, **Posting Date** yesterday, two lines of Rs. 1 → **Save**. **Expected:** refused — *"Journal Entry cannot be dated … for company Blueline Enterprises Pvt Ltd: postings before … are not allowed. Contact a System Manager if this document genuinely needs to be backdated."*
+3. Change the date to today → **Save**. **Expected:** saves (Draft). Delete it.
+4. Same check on a Sales Invoice (tick **Edit Posting Date and Time**) and a Petty Cash Voucher. **Expected:** the same refusal for yesterday. (The guard covers 18 document types, listed in user manual 5.5. **Asset Repair is not checked**: ERPNext 15.6 posts it on the day it is submitted, so it can't post before the cut-off.)
+5. **System Manager override:** as `ceo@gen-innov.com`, save a Journal Entry dated yesterday. **Expected:** saves; the timeline shows *"Posting date override: ceo@gen-innov.com saved this Journal Entry with posting_date = … before the configured earliest allowed posting date …"*. Delete the draft.
+6. **Cleanup:** clear the Earliest Allowed Posting Date (or set the date the accountant wants) → Save.
+7. **Wrong results:** a back-dated document saves for a non–System Manager; the override leaves no comment.
 
 ---
 
@@ -347,10 +357,20 @@ Use the multi-payee invoice from 2.7 (three entries: 6.00, 130.00, 130.00) and t
 6. Use the 2.2 invoice whose entry is **Paid** (from 2.6). Issue and approve a full Credit Note.
 7. **Expected:** the Paid entry is **unchanged** (still Paid, 3.00), with an Adjustments row *Deduction Created* linking a new entry. That new entry: **Entry Type = Deduction**, **Commission Amount −3.00**, **Deduct from Next Payout** ticked, **Credit Note** = your `BTAX-RET-…`, **Against Commission Entry** = the paid entry, same Matched Sales Person and Credited To, Status **Payment Received - Pending Approval**. The accountant and office@ get the usual "pending your approval" bell notification.
 8. **Approve the deduction like any commission entry (2.4):** as ceo@, try ticking both boxes → refused (*"… must be given by two different users …"*). Then the accountant ticks **Approved by Management**, office@ ticks **Approved by Technical** → **Expected:** Status **Approved**, both "… Approval By" names filled in, ticks locked.
-8a. As the accountant: **Actions → Mark as Paid** on the approved deduction → **Expected:** refused — *"… is a deduction. Deductions are taken off a payout, not marked as Paid."* (K13). It stays Approved.
+8a. As the accountant: **Actions → Mark as Paid** on the approved deduction → **Expected:** refused — *"… is a deduction. It can't be marked Paid by itself: it is taken off the person's payout automatically when their next commission entry is marked Paid."* It stays Approved.
 
 **D. Register**
-9. Open **/app/sales-commission-register** (company Blueline). **Expected:** a table **Outstanding Deductions (deduct from next payout)** listing `Sales Team  LDA Perera` with **Amount to Deduct 3.00** and the deduction entry, shown with its **Approved** badge (approved but not yet taken off a payout still counts as outstanding). The status cards do **not** include the deduction. In the main table, the deduction row shows Type **Deduction**, and reduced entries show *"was …"* under the amount.
+9. Open **/app/sales-commission-register** (company Blueline). **Expected:** a table **Outstanding Deductions** listing `Sales Team  LDA Perera` with the deduction entry, shown with its **Approved** badge (approved but not yet taken off a payout still counts as outstanding). The 3.00 is in **Comes Off Next Payout** if the person's *Approved commission* (shown under their name) is at least 3.00, otherwise in **Approved, Too Large to Fit Yet**; a deduction not yet approved is in **Awaiting Approval (won't come off yet)**. Each entry is labelled with its column. The status cards do **not** include the deduction. In the main table, the deduction row shows Type **Deduction**, and reduced entries show *"was …"* under the amount.
+
+**D2. The deduction is taken off the next payout — [PERMANENT]**
+9a. Get an **Approved** commission entry for the same **Commission Credited To** (`Sales Team  LDA Perera`) and company — e.g. a new 2.2-style invoice, paid, both ticks given (2.3–2.4).
+9b. Record its payout as in 2.6, but for the **net** amount: the commission minus the deduction (e.g. commission 6.00, deduction −3.00 → payout 3.00). Approve the payout.
+9c. As the accountant: link the payout on the commission entry → **Update** → **Actions → Mark as Paid**. **Expected:** the commission entry is **Paid**; the deduction is now **Paid** too, with the **same Payment Entry**, and its timeline says *"Taken off payout … together with commission entry SCE-…"*. The deduction is gone from **Outstanding Deductions** on the register.
+9d. **Only the net is needed:** a payout for less than the net is refused (*"… and the deductions taken off with it (…) would make …, more than was paid."*).
+9e. **Not yet approved deductions stay:** a deduction still in *Payment Received - Pending Approval* is not taken off; the payout must then cover the full commission.
+9f. **Too big to take off:** a deduction larger than what the person receives from the payout waits; it is taken off once enough of their commission is on a payout (the person never goes below zero on a payout).
+9g. **Locked once taken off:** the Credit Note that created the deduction can no longer be cancelled (*"… its commission deductions … have already been taken off a payout (…)"*), and the payout can't be cancelled (2.6 step 5).
+9h. **Fully offset (net 0.00):** with an Approved deduction of −65.00 and an Approved commission entry of 65.00 for the same person, leave **Payment Entry** empty → **Actions → Mark as Paid**. **Expected:** both are **Paid** with no Payment Entry; each timeline says *"Fully offset by deductions …"*. With any other net (e.g. commission 130.00), the same step is refused: *"Select the Payment Entry that paid this commission out … It can only be left empty when Approved deductions take off the whole commission (net 0.00)."*
 
 **E. Cancel a Credit Note → everything restored (K12)**
 10. As ceo@: open the Credit Note from step 1 → **Cancel**. **Expected:** the three entries go back to their amounts before that Credit Note; any that it cancelled return to their previous status. Its Adjustments rows stay, ticked **Reversed**, with **Reversed By**. Cancelling the Credit Note from step 6 cancels its Deduction entry (status Cancelled) and the deduction disappears from the register.
@@ -619,10 +639,13 @@ While logged in, open these URLs in the browser (read-only; they return the dash
 - **Wrong result:** "Transport - private vehicle expenses - I24" appears for Global Intech.
 
 ### 5.5 "Show raw ledger totals" toggle — [SAFE]
-1. With Blueline selected, the toggle **Show raw ledger totals** above the cards is **off**. **Expected** line under the cards: *"Cards regroup wrong-direction balances; the monthly table shows raw figures."*
-2. Tick the toggle. **Expected:** the cards' labels end in *(raw ledger)*, Blueline's Output card shows the posted figure (**−564,871.43** on the 2026-10-08 figures), and the line under the cards reads exactly *"Showing raw ledger totals; no regrouping applied."* The Net card, chart and monthly table don't change.
-3. Untick it. **Expected:** the original cards and the original line come back.
-4. **Wrong results:** the line doesn't change with the toggle; the Net figure differs between on and off.
+> **Changed (branch `feature/vat-discrepancies`):** raw totals are now the default, and wrong-direction balances are listed as discrepancies.
+
+1. With Blueline selected, the toggle **Show raw ledger totals** above the cards is **on**. **Expected:** the cards' labels end in *(raw ledger)*, Blueline's Output card shows the posted figure (**−564,871.43** on the 2026-10-08 figures), and the line under the cards reads exactly *"Showing raw ledger totals; no regrouping applied."*
+2. **Discrepancies panel:** above the toggle, a red box *"Ledger discrepancies: N VAT account(s) with a wrong-direction balance"* lists each Output VAT account with a debit balance (and any Input VAT account with a credit balance) for the period: account, *Should be* / *Is*, amount. Each account name opens the General Ledger for it. Pick a company and period with no such account → the box is not shown.
+3. Untick the toggle. **Expected:** regrouped cards; the line reads *"Regrouped: Output accounts with a debit balance are counted under Input. They are still listed as discrepancies above; the monthly table shows raw figures."* The discrepancies box stays. The Net card, chart and monthly table don't change.
+4. **Export to Excel:** the CSV ends with a *Ledger discrepancies* block listing the same accounts.
+5. **Wrong results:** the toggle starts off; the discrepancies box disappears when regrouped; the Net figure differs between on and off.
 
 ---
 
@@ -669,7 +692,7 @@ Tick **P** (pass), **F** (fail), or **K** (known issue from 0.5).
 | 2.7 | Multi-payee invoice → 3 entries with correct credited-to and amounts | ☐ | ☐ | |
 | 2.8 | Cleanup: invoice Cancel refused; reversed by Credit Note; unpaid commission Cancelled, none under the Credit Note | ☐ | ☐ | |
 | 2.10 | **New:** no tick / Approve / Approved while the invoice owes money (any role); undone payment → untouched entries back to Accrued, ticked/Approved ones keep status with a Payment Warning, cleared when paid again | ☐ | ☐ | |
-| 2.9 | **New:** Credit Note reduces unpaid commission in proportion / cancels on full return; paid → Deduction entry (Pending Approval, two different approvers, can't be marked Paid); register shows outstanding deductions, approved ones included; cancelling the Credit Note restores all; status lock holds; no ledger posting | ☐ | ☐ | ☐ (K12/K13) |
+| 2.9 | **New:** Credit Note reduces unpaid commission in proportion / cancels on full return; paid → Deduction entry (Pending Approval, two different approvers, can't be marked Paid by hand); register shows outstanding deductions, approved ones included; **approved deduction taken off the payee's next payout when their commission is marked Paid (D2)**; cancelling the Credit Note restores all (refused once its deduction is taken off); status lock holds; no ledger posting | ☐ | ☐ | ☐ (K12) |
 | 3.1 | Quotation: no Submit; Send for Approval → Approve submits; SD2 unchanged; office@ refused approving own quotation | ☐ | ☐ | ☐ (K3/K10) |
 | 3.2 | Purchase Order: no Submit; Send for Approval; Approve offered | ☐ | ☐ | |
 | 3.3 | Sales Invoice: no Submit; Send for Approval; Approve offered | ☐ | ☐ | |

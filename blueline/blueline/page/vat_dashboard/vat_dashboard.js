@@ -105,19 +105,33 @@ blueline.VatDashboard = class VatDashboard {
 					font-size: 12px;
 					color: var(--text-muted);
 				}
+				.vat-dashboard .vatd-discrepancies {
+					border: 1px solid var(--red-500, #ff5858);
+					border-radius: var(--border-radius-md, 6px);
+					background: var(--red-50, #fff5f5);
+					padding: 12px 15px;
+					margin-bottom: 20px;
+				}
+				.vat-dashboard .vatd-discrepancies-title {
+					font-weight: 600;
+					color: var(--red-600, #e24c4c);
+					margin-bottom: 6px;
+				}
+				.vat-dashboard .vatd-discrepancies table { margin: 8px 0 0; background: var(--fg-color); }
 			</style>`).appendTo("head");
 		}
 
 		this.body = $(`
 			<div class="vat-dashboard">
+				<div class="vatd-discrepancies" style="display: none"></div>
 				<div class="vatd-toggle">
 					<label>
-						<input type="checkbox" class="vatd-raw-toggle">
+						<input type="checkbox" class="vatd-raw-toggle" checked>
 						${__("Show raw ledger totals")}
 					</label>
 				</div>
 				<div class="row vatd-cards"></div>
-				<div class="vatd-cards-note">${VatDashboard.cards_note(false)}</div>
+				<div class="vatd-cards-note">${VatDashboard.cards_note(true)}</div>
 				<div class="row vatd-charts">
 					<div class="col-md-12">
 						<div class="vatd-chart-title">${__("Monthly Output vs Input vs Net VAT")}</div>
@@ -133,9 +147,10 @@ blueline.VatDashboard = class VatDashboard {
 			</div>
 		`).appendTo(this.page.body);
 
-		// Off by default (regrouped cards, as before). Switching only re-renders the cards
-		// from data already loaded; both summaries come back in the same response.
-		this.show_raw = false;
+		// On by default: the cards show each account as posted. Unticking shows the regrouped
+		// cards. Switching only re-renders the cards from data already loaded; both summaries
+		// come back in the same response.
+		this.show_raw = true;
 		this.body.find(".vatd-raw-toggle").on("change", (e) => {
 			this.show_raw = e.target.checked;
 			if (this.data) {
@@ -154,7 +169,9 @@ blueline.VatDashboard = class VatDashboard {
 	static cards_note(show_raw) {
 		return show_raw
 			? __("Showing raw ledger totals; no regrouping applied.")
-			: __("Cards regroup wrong-direction balances; the monthly table shows raw figures.");
+			: __(
+					"Regrouped: Output accounts with a debit balance are counted under Input. They are still listed as discrepancies above; the monthly table shows raw figures."
+			  );
 	}
 
 	refresh() {
@@ -177,6 +194,7 @@ blueline.VatDashboard = class VatDashboard {
 	}
 
 	render(data) {
+		this.render_discrepancies(data.discrepancies);
 		this.render_cards(this.get_card_summary(data));
 		this.render_monthly_chart(data.monthly);
 		this.render_monthly_table(data.monthly);
@@ -212,6 +230,49 @@ blueline.VatDashboard = class VatDashboard {
 			`).appendTo($cards);
 		});
 		this.body.find(".vatd-cards-note").text(VatDashboard.cards_note(this.show_raw));
+	}
+
+	// Wrong-direction balances (get_discrepancies on the server): always shown, whichever way
+	// the cards are grouped, so a posting error is never only visible as a regrouped total.
+	render_discrepancies(rows) {
+		const $el = this.body.find(".vatd-discrepancies").empty();
+		if (!rows || !rows.length) {
+			$el.hide();
+			return;
+		}
+		const currency = frappe.defaults.get_default("currency");
+		$(`
+			<div class="vatd-discrepancies-title">
+				${__("Ledger discrepancies: {0} VAT account(s) with a wrong-direction balance", [rows.length])}
+			</div>
+			<div>${__("Check the postings on these accounts for the period; each is usually a wrong account or a reversed entry.")}</div>
+			<table class="table table-bordered table-sm">
+				<thead>
+					<tr>
+						<th>${__("Account")}</th>
+						<th>${__("Type")}</th>
+						<th>${__("Should be")}</th>
+						<th>${__("Is")}</th>
+						<th class="text-right">${__("Amount")}</th>
+					</tr>
+				</thead>
+				<tbody>
+					${rows
+						.map(
+							(row) => `
+						<tr>
+							<td><a href="/app/query-report/General%20Ledger?company=${encodeURIComponent(this.company_field.get_value() || "")}&account=${encodeURIComponent(row.account)}">${frappe.utils.escape_html(row.account)}</a></td>
+							<td>${row.classification === "output" ? __("Output VAT") : __("Input VAT")}</td>
+							<td>${__("{0} balance", [frappe.utils.escape_html(row.expected_balance)])}</td>
+							<td>${__("{0} balance", [frappe.utils.escape_html(row.actual_balance)])}</td>
+							<td class="text-right">${format_currency(row.amount, currency)}</td>
+						</tr>`
+						)
+						.join("")}
+				</tbody>
+			</table>
+		`).appendTo($el);
+		$el.show();
 	}
 
 	render_monthly_chart(rows) {
@@ -311,6 +372,20 @@ blueline.VatDashboard = class VatDashboard {
 			csv_rows.push([row.month, row.output, row.input, row.net]);
 		});
 		csv_rows.push([__("Total"), total_output, total_input, total_net]);
+
+		const discrepancies = (this.data && this.data.discrepancies) || [];
+		if (discrepancies.length) {
+			csv_rows.push([]);
+			csv_rows.push([__("Ledger discrepancies"), __("Type"), __("Balance"), __("Amount")]);
+			discrepancies.forEach((row) => {
+				csv_rows.push([
+					row.account,
+					row.classification === "output" ? __("Output VAT") : __("Input VAT"),
+					__("{0} (should be {1})", [row.actual_balance, row.expected_balance]),
+					row.amount,
+				]);
+			});
+		}
 
 		const csv_content = csv_rows
 			.map((row) =>

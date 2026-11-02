@@ -22,6 +22,10 @@ Added on `feature/final-items`:
 8. Mark as Paid links the payout's Payment Entry (new 3.4);
 9. the VAT Dashboard's raw-totals switch explains itself under the cards (VAT Dashboard section).
 
+Added on `release/client-review-2`:
+
+10. documents can't be dated before the company's Earliest Allowed Posting Date, except by a System Manager (new 5.5).
+
 Each block below says exactly which part of the manual it replaces or adds to. Text in quotes is the **current** wording, for locating it. Everything under "New text" is ready to paste. Update the manual only once the branch is deployed to production.
 
 Notes for the editor are marked **[Editor]** and are not part of the manual.
@@ -77,11 +81,23 @@ Notes for the editor are marked **[Editor]** and are not part of the manual.
 >
 > Commission entries never post anything to the accounts. Only the Credit Note itself changes the ledger.
 >
-> **Outstanding deductions** are listed per person at the top of the **Sales Commission Register** — whether still waiting for approval or already approved. Take them off that person's next commission payout. Deductions are not included in the status totals, and a deduction can't be marked as Paid.
+> **Outstanding deductions** are listed per person at the top of the **Sales Commission Register**, in three columns:
+>
+> - **Awaiting Approval (won't come off yet)** — not yet signed off by two people; nothing takes these off a payout.
+> - **Comes Off Next Payout** — Approved, and they fit into the person's Approved commission that is waiting to be paid (shown under their name as *Approved commission*), if all of it is paid out on one payout.
+> - **Approved, Too Large to Fit Yet** — Approved, but they don't fit into that commission; they wait until there is enough.
+>
+> Each deduction entry is labelled with its column. Deductions are not included in the status totals.
+>
+> **Deductions come off the next payout by themselves.** When one of a person's commission entries is marked Paid (section 3.4), the system goes through that person's **Approved** deductions for the same company, **oldest first** (by date, then entry number), and takes each one off **whole** if it fits: the person's commission on that payout, less the deductions already taken off, must not go below zero. A deduction that doesn't fit is **skipped** — it stays Approved and waits for a later payout — and the system carries on with the next one, so a **later, smaller deduction can come off before an older, larger one**. Deductions still awaiting approval are never taken off. Each deduction taken off is marked **Paid** with the same Payment Entry and leaves the Outstanding Deductions list.
+>
+> **When the deductions cancel the commission exactly.** If the deductions taken off add up to exactly the commission (net 0.00), there is nothing to pay out — and ERPNext can't record a payment of 0.00. Leave **Payment Entry** empty and use **Actions → Mark as Paid**: the commission entry and the deductions are all marked **Paid** with no Payment Entry, and each one's timeline says *"Fully offset by deductions …"*. In every other case a Payment Entry is required.
+>
+> A deduction can't be marked Paid by hand, and once it has been taken off, the Credit Note that created it can no longer be cancelled.
 >
 > If the commission can't be adjusted for some reason, the Credit Note is **not approved**. The approver sees *"Commission could not be adjusted for this Credit Note; nothing was changed. Contact the administrator."* Nothing has changed — not the Credit Note, not the accounts, not the commission — so the administrator can fix the cause and the Credit Note can then be approved as normal.
 
-**[Editor]** Deductions don't yet have a payout step; an approved deduction stays listed on the register until it is taken off a payout. Update this paragraph once the payout netting is built.
+**[Editor]** The "come off the next payout by themselves" paragraph is from branch `feature/commission-deduction-netting`; use it only once that branch is deployed.
 
 ---
 
@@ -129,7 +145,13 @@ Notes for the editor are marked **[Editor]** and are not part of the manual.
 >
 > One payout can cover several commission entries, as long as their commission adds up to no more than the amount the payout paid; the entry that would go over is refused. Once an entry is Paid, its Payment Entry can't be changed by anyone, and the payout can't be cancelled while Paid entries point to it.
 >
-> **Deductions** (3.2a) are never marked Paid: they are taken off a later payout.
+> **Deductions** (3.2a): when you mark an entry Paid, the person's Approved deductions that fit are taken off the same payout automatically (oldest first; one that doesn't fit is skipped and a later one may still be taken), so record the payout for the commission **minus** the deductions that will come off.
+>
+> To know that amount, use the register's **Comes Off Next Payout** column, not the whole Outstanding Deductions list: deductions *Awaiting Approval* or *Too Large to Fit Yet* will **not** come off. The column assumes all of the person's Approved commission is paid on **one** payout. If you pay their entries on separate payouts, each Mark as Paid only fits deductions into the commission on that payout, so less may come off at a time.
+>
+> If the payout turns out smaller than the commission minus what actually comes off, Mark as Paid is refused (*"… more than was paid"*) and nothing changes. The confirmation after Mark as Paid names the deductions that were taken off.
+>
+> **Nothing to pay (net 0.00):** if the deductions that come off equal the commission exactly, skip step 1 — leave **Payment Entry** empty and use **Actions → Mark as Paid** (3.2a). Any other amount needs a Payment Entry.
 
 **[Editor]** The company needs a Payable account to pay commission from (for example *Commission payable*); the accountant sets this up once.
 
@@ -200,15 +222,39 @@ Notes for the editor are marked **[Editor]** and are not part of the manual.
 
 **[Editor]** On Petty Cash Vouchers today, *Approve* is given to GI Management and GI Tech Dept only — GI Sales Dept has the direct *Submit* shortcut but not *Approve*. If GI Sales Dept should approve vouchers too, a System Manager can add it with the steps above.
 
+### 5e. Add a new section 5.5 after 5.4 (from branch `feature/posting-date-guard-v2`)
+
+**New text:**
+
+> **5.5 Earliest Allowed Posting Date (closing a period)**
+>
+> Each company can be given an **Earliest Allowed Posting Date**: once the accountant has closed a period, nothing can be dated before it. It is set in the **COA Mapping Console**, under **Guardrail**, for each company separately. The field's help text reads: *"Documents that post to this company's ledger can't be dated before this. A System Manager may override; the override is recorded on the document."* Leave it empty and there is no restriction.
+>
+> **Which documents.** The documents that post to the company's accounts or stock (18 types): Sales Invoices and Credit Notes, Purchase Invoices, Payment Entries, Journal Entries, Petty Cash Vouchers, Delivery Notes, Purchase Receipts, Stock Entries, Stock Reconciliations, Landed Cost Vouchers, POS Invoices and POS Closing Entries, Subcontracting Receipts, Asset Capitalizations, Asset Value Adjustments, Exchange Rate Revaluations, Invoice Discounting and Period Closing Vouchers. The date checked is the document's **Posting Date**, except: Period Closing Voucher — its **Transaction Date**; Asset Value Adjustment — its **Date**.
+>
+> **Asset Repairs are not checked:** ERPNext 15.6 posts an Asset Repair on the day it is submitted, whatever its completion date, so it can never post before the cut-off.
+>
+> **What you see.** The check runs **every time the document is saved — including Save as a draft**, not only when it is sent for approval or submitted. A document dated before the cut-off is refused with:
+>
+> *"Journal Entry cannot be dated 2026-10-31 for company Blueline Enterprises Pvt Ltd: postings before 2026-11-01 are not allowed. Contact a System Manager if this document genuinely needs to be backdated."*
+>
+> (with the document type, dates and company filled in). Nothing is saved; change the date to the cut-off or later, or ask a System Manager.
+>
+> **Who can override.** Only a user with the **System Manager** role (and the built-in Administrator account) can save a document dated before the cut-off. The save goes through, and the document's timeline gets a comment such as: *"Posting date override: ceo@gen-innov.com saved this Journal Entry with posting_date = 2026-10-31 for company Blueline Enterprises Pvt Ltd, before the configured earliest allowed posting date of 2026-11-01. Allowed because the user holds the System Manager role."* Each override leaves this comment — one per document per person per day, so re-saving the same document the same day doesn't repeat it.
+
+**[Editor]** If the manual has an "Accounts setup" or COA console section, add a one-line pointer there to 5.5.
+
 ---
 
-## VAT Dashboard section (from `feature/vat-raw-ledger-totals` and `feature/final-items`)
+## VAT Dashboard section (from `feature/vat-raw-ledger-totals`, `feature/final-items` and `feature/vat-discrepancies`)
 
 ### Add this paragraph after the description of the summary cards
 
 **New text:**
 
-> **Show raw ledger totals.** Above the cards there is a switch, **Show raw ledger totals**. Off (the default), the cards move any output-VAT account with a debit balance into Input, and the line under the cards says *"Cards regroup wrong-direction balances; the monthly table shows raw figures."* On, the cards show each account exactly as posted — Output can then be negative — and the line reads *"Showing raw ledger totals; no regrouping applied."* The Net VAT figure, the chart and the monthly table are the same either way.
+> **Ledger discrepancies.** If any VAT account's balance for the period runs the wrong way — an Output VAT account with a debit balance, or an Input VAT account with a credit balance — a red box at the top lists it: the account, which way it should be and which way it is, and the amount. This usually means a posting to the wrong account or a reversed entry; click the account name to open its General Ledger and correct it. The box is always shown when there is something to check, and the list is also included in **Export to Excel**.
+>
+> **Show raw ledger totals.** Above the cards there is a switch, **Show raw ledger totals**. On (the default), the cards show each account exactly as posted — Output can then be negative — and the line under the cards reads *"Showing raw ledger totals; no regrouping applied."* Off, the cards count any Output VAT account with a debit balance under Input instead; those accounts are still listed in the discrepancies box. The Net VAT figure, the chart and the monthly table are the same either way.
 
 **[Editor]** Place this in the VAT Dashboard section of the manual; it describes behaviour shipped on the release branch.
 
@@ -246,7 +292,7 @@ Notes for the editor are marked **[Editor]** and are not part of the manual.
 | I tried to approve a commission entry and got "This commission cannot be approved while the invoice still has an outstanding amount." | The customer hasn't paid the invoice in full yet (or a payment was cancelled). Approve it once the invoice shows nothing outstanding — after the remaining payment, or after a Credit Note is applied to it. |
 | Mark as Paid says "Select the Payment Entry that paid this commission out". | Record the payout first (Payment Entry, type Pay, approved), choose it in the entry's **Payment Entry** field, click **Update**, then Mark as Paid. |
 | A commission entry shows a red Payment Warning. What do I do? | A payment on its invoice was cancelled after the entry was ticked or approved. Don't pay that commission until the invoice is fully paid again; the warning then disappears by itself. |
-| A customer returned goods after the commission was paid. Do I have to fix the commission? | No. Approving the Credit Note creates a Deduction entry for that person automatically. It is listed under Outstanding Deductions on the Sales Commission Register; take it off their next payout. |
+| A customer returned goods after the commission was paid. Do I have to fix the commission? | No. Approving the Credit Note creates a Deduction entry for that person automatically. Once it is approved, it comes off by itself when one of their commission entries is marked Paid, as soon as it fits into the commission on that payout (3.2a). Until then it is listed under Outstanding Deductions on the Sales Commission Register, in the column that says whether it will come off next. |
 
 ---
 
@@ -282,3 +328,62 @@ Notes for the editor are marked **[Editor]** and are not part of the manual.
 > 9. The sales commission on the invoice is adjusted automatically when the Credit Note is approved (see 3.2a). Commission already paid shows up as a deduction on the Sales Commission Register. Commission on the rest of the invoice becomes ready for approval as soon as nothing is left to pay — whether that happens through a payment, this reconciliation, or both, in any order.
 >
 > **[Editor]** Production's ERPNext has no "Update Outstanding for Self" option on a Credit Note, so these steps always use Payment Reconciliation. If ERPNext is upgraded and the option appears, keep it ticked and these steps still apply.
+
+---
+
+## New section — Dashboards (from branch `feature/kpi-dashboards`)
+
+### Add as a new section after the VAT Dashboard section
+
+**New text:**
+
+> **Dashboards**
+>
+> Both dashboards are on the **Blueline Control Center** workspace, under **Dashboards**.
+>
+> **My Dashboard** — for everyone. It shows your own work:
+>
+> - **Waiting for my approval** — documents someone else sent for approval that you are allowed to approve. Documents you created or sent yourself are never listed here, because you can't approve them. Click a document to open it.
+> - **Sent by me, still waiting** — documents you sent for approval that nobody has approved yet, and how long they have been waiting.
+> - **My drafts** — documents you started but haven't sent for approval.
+> - **My quotations** — submitted this month, and those still open.
+> - **My sales and commission** — your net sales this month and this fiscal year, and your commission by status. This shows only if your user is linked to your Sales Person (your administrator sets your **User ID** on your Employee record, and that Employee on your Sales Person).
+>
+> **Business KPI Dashboard** — for management (GI Management, the Financial Manager and System Managers). Choose a **Company**, or leave it empty for all companies you can see. Three tabs:
+>
+> - **Sales Performance** — net sales this month (with last month) and this fiscal year (with the same period last year); quotations this fiscal year and how many became orders; the 12-month trend; top customers and items; sales by company. *Net sales* means excluding VAT, with Credit Notes deducted.
+> - **Financial Health** — receivables and payables outstanding, how much is overdue, and how long (aging); cash and bank balances; each company's VAT position for this fiscal year, with a red warning when the VAT Dashboard lists ledger discrepancies; petty cash this month.
+> - **Commission** — entries waiting for approval, approved but not yet paid, outstanding deductions, this month's commission by status, and the top earners this fiscal year.
+>
+> If a section says **No access**, your role can't read that kind of document; the rest of the dashboard still works.
+
+---
+
+## New section — Document storage by fiscal year (from branch `feature/fiscal-year-folders`)
+
+### Add as a new section at the end of the manual
+
+**New text:**
+
+> **Where your documents are kept**
+>
+> Every file you attach to a document (the paperclip / **Attach** on any form) is stored online and filed automatically by **fiscal year**, **company** and **type of document**. Open them from the document itself, or browse them in **File Manager** (search *File*):
+>
+> *Home → Fiscal Year 2026-2027 → Blueline Enterprises Pvt Ltd → Sales*
+>
+> | Folder | What goes there |
+> |---|---|
+> | Sales | attachments on Quotations, Sales Orders, Delivery Notes, Sales Invoices and Credit Notes |
+> | Purchases | Purchase Orders, Purchase Receipts, Purchase Invoices |
+> | Bank & Payments | Payment Entries, Journal Entries, bank transactions |
+> | Petty Cash | Petty Cash Vouchers |
+> | Shipping & CusDec | Landed Cost Vouchers (CusDec, bills of lading, shipping documents) |
+> | General | anything you want to keep for the year that isn't attached to a document |
+>
+> The fiscal year comes from the document's date, not the day you attach the file, so a file attached in May to a March invoice goes into March's fiscal year.
+>
+> Filing doesn't change who can open a file: an attachment can be opened by the people who can open its document.
+>
+> Folders for a new fiscal year appear automatically when the accountant creates the Fiscal Year.
+
+**[Editor]** Attachments made before this branch was deployed stay in *Home/Attachments* until an administrator runs the one-off move (`blueline.document_folders.refile_existing_attachments`, dry run first).
