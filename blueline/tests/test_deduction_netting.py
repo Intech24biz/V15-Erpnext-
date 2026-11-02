@@ -241,3 +241,79 @@ class TestFullyOffsetByDeductions(BluelineTestCase):
 		# The form route: Actions -> Mark as Paid with Payment Entry left empty.
 		act(FINANCIAL_MANAGER, apply_workflow, entry(commission.name).as_json(), "Mark as Paid")
 		self.assertFullyOffset(commission.name, deductions)
+
+
+def clear_waiting_commission(name_of_a_deduction):
+	"""The test invoices also leave Approved commission for the same payee (other sales
+	people credited to the same group). Move it out of Approved so the test decides exactly
+	what the payee's next payout covers. Rolled back with the test."""
+	d = entry(name_of_a_deduction)
+	for name in frappe.get_all(
+		SCE,
+		filters={
+			"entry_type": ["!=", "Deduction"],
+			"status": "Approved",
+			"commission_credited_to": d.commission_credited_to,
+			"company": d.company,
+		},
+		pluck="name",
+	):
+		frappe.db.set_value(SCE, name, "status", "Accrued")
+
+
+def register_row(deduction_name):
+	d = entry(deduction_name)
+	data = act(FINANCIAL_MANAGER, get_entries, company=d.company)
+	[row] = [r for r in data["deductions"] if r["commission_credited_to"] == d.commission_credited_to]
+	return row
+
+
+def buckets(row):
+	return {e["name"]: e["bucket"] for e in row["entries"]}
+
+
+class TestRegisterSplitsOutstandingDeductions(BluelineTestCase):
+	"""The register shows, per payee, what is awaiting approval, what comes off the next
+	payout and what is approved but too large to fit yet, by the same rule as Mark as Paid."""
+
+	def test_three_figures_match_what_mark_as_paid_takes_off(self):
+		small, large, pending = unapproved_deductions(1, 2, 1)  # -65, -130, -65 (oldest first)
+		approve(small)
+		approve(large)
+		clear_waiting_commission(small)
+		commission = next_commission(qty=2)  # 130 waiting
+
+		row = register_row(small)
+		self.assertEqual(flt(row["approved_commission"]), 130)
+		self.assertEqual(buckets(row), {small: "next_payout", large: "too_large", pending: "awaiting_approval"})
+		self.assertEqual(
+			(flt(row["awaiting_approval_amount"]), flt(row["next_payout_amount"]), flt(row["too_large_amount"])),
+			(-65, -65, -130),
+		)
+		self.assertEqual(flt(row["amount"]), -260)
+
+		# The register's "next payout" figure is exactly what Mark as Paid takes off.
+		act(FINANCIAL_MANAGER, mark_commission_entry_paid, commission.name, approved_payout(130 - 65).name)
+		self.assertEqual((entry(small).status, entry(large).status), ("Paid", "Approved"))
+
+		row = register_row(large)
+		self.assertEqual(buckets(row), {large: "too_large", pending: "awaiting_approval"})
+		self.assertEqual(flt(row["approved_commission"]), 0)
+
+	def test_an_older_deduction_that_does_not_fit_is_skipped_for_a_later_one(self):
+		large, small = unapproved_deductions(2, 1)  # -130 older, -65 newer
+		approve(large)
+		approve(small)
+		clear_waiting_commission(large)
+		commission = next_commission(qty=1)  # 65 waiting
+
+		self.assertEqual(buckets(register_row(large)), {large: "too_large", small: "next_payout"})
+		act(FINANCIAL_MANAGER, mark_commission_entry_paid, commission.name, None)  # 65 - 65 = 0
+		self.assertEqual((entry(large).status, entry(small).status), ("Approved", "Paid"))
+
+	def test_nothing_approved_waiting_means_nothing_comes_off(self):
+		[deduction] = unapproved_deductions(1)
+		approve(deduction)
+		clear_waiting_commission(deduction)
+		row = register_row(deduction)
+		self.assertEqual((flt(row["approved_commission"]), buckets(row)), (0, {deduction: "too_large"}))
