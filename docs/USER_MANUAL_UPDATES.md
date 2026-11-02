@@ -22,6 +22,10 @@ Added on `feature/final-items`:
 8. Mark as Paid links the payout's Payment Entry (new 3.4);
 9. the VAT Dashboard's raw-totals switch explains itself under the cards (VAT Dashboard section).
 
+Added on `release/client-review-2`:
+
+10. documents can't be dated before the company's Earliest Allowed Posting Date, except by a System Manager (new 5.5).
+
 Each block below says exactly which part of the manual it replaces or adds to. Text in quotes is the **current** wording, for locating it. Everything under "New text" is ready to paste. Update the manual only once the branch is deployed to production.
 
 Notes for the editor are marked **[Editor]** and are not part of the manual.
@@ -201,6 +205,26 @@ Notes for the editor are marked **[Editor]** and are not part of the manual.
 > Leave the *Send for Approval* rows alone unless you also want to change who can send documents for approval. Whatever the workflow says, nobody can approve a document they created or sent for approval.
 
 **[Editor]** On Petty Cash Vouchers today, *Approve* is given to GI Management and GI Tech Dept only — GI Sales Dept has the direct *Submit* shortcut but not *Approve*. If GI Sales Dept should approve vouchers too, a System Manager can add it with the steps above.
+
+### 5e. Add a new section 5.5 after 5.4 (from branch `feature/posting-date-guard-v2`)
+
+**New text:**
+
+> **5.5 Earliest Allowed Posting Date (closing a period)**
+>
+> Each company can be given an **Earliest Allowed Posting Date**: once the accountant has closed a period, nothing can be dated before it. It is set in the **COA Mapping Console**, under **Guardrail**, for each company separately. The field's help text reads: *"Documents that post to this company's ledger can't be dated before this. A System Manager may override; the override is recorded on the document."* Leave it empty and there is no restriction.
+>
+> **Which documents.** Every document that posts to the company's accounts or stock: Sales Invoices and Credit Notes, Purchase Invoices, Payment Entries, Journal Entries, Petty Cash Vouchers, Delivery Notes, Purchase Receipts, Stock Entries, Stock Reconciliations, Landed Cost Vouchers, POS Invoices and POS Closing Entries, Subcontracting Receipts, Asset Capitalizations, Asset Repairs, Asset Value Adjustments, Exchange Rate Revaluations, Invoice Discounting and Period Closing Vouchers. The date checked is the document's **Posting Date**, except: Period Closing Voucher — its **Transaction Date**; Asset Repair — its **Completion Date** (a repair with no completion date yet isn't checked); Asset Value Adjustment — its **Date**.
+>
+> **What you see.** The check runs **every time the document is saved — including Save as a draft**, not only when it is sent for approval or submitted. A document dated before the cut-off is refused with:
+>
+> *"Journal Entry cannot be dated 2026-10-31 for company Blueline Enterprises Pvt Ltd: postings before 2026-11-01 are not allowed. Contact a System Manager if this document genuinely needs to be backdated."*
+>
+> (with the document type, dates and company filled in). Nothing is saved; change the date to the cut-off or later, or ask a System Manager.
+>
+> **Who can override.** Only a user with the **System Manager** role (and the built-in Administrator account) can save a document dated before the cut-off. The save goes through, and the document's timeline gets a comment such as: *"Posting date override: ceo@gen-innov.com saved this Journal Entry with posting_date = 2026-10-31 for company Blueline Enterprises Pvt Ltd, before the configured earliest allowed posting date of 2026-11-01. Allowed because the user holds the System Manager role."* Each override leaves this comment — one per document per person per day, so re-saving the same document the same day doesn't repeat it.
+
+**[Editor]** If the manual has an "Accounts setup" or COA console section, add a one-line pointer there to 5.5.
 
 ---
 
