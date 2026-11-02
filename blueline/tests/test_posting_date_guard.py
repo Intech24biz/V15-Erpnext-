@@ -187,3 +187,53 @@ class TestStockAndAssetDoctypes(BluelineTestCase):
 		self.assertRefused(lambda: reconcile(add_days(nowdate(), -1)), REFUSED)
 		self.assertTrue(reconcile(nowdate()).name)
 
+
+
+class TestOverrideCommentOncePerDay(BluelineTestCase):
+	def setUp(self):
+		super().setUp()
+		set_cutoff(nowdate())
+
+	def override_comments(self, je):
+		return frappe.get_all(
+			"Comment",
+			filters={
+				"reference_doctype": "Journal Entry",
+				"reference_name": je.name,
+				"comment_type": "Info",
+				"content": ["like", "Posting date override:%"],
+			},
+			pluck="content",
+		)
+
+	def test_re_saving_the_same_day_adds_no_second_comment(self):
+		je = journal_entry(SYSTEM_MANAGER, add_days(nowdate(), -1))
+		for i in range(2):
+			with as_user(SYSTEM_MANAGER):
+				je = frappe.get_doc("Journal Entry", je.name)
+				je.user_remark = f"re-saved {i}"
+				je.save()
+		self.assertEqual(len(self.override_comments(je)), 1)
+
+	def test_another_user_overriding_gets_their_own_comment(self):
+		je = journal_entry(SYSTEM_MANAGER, add_days(nowdate(), -1))
+		frappe.set_user("Administrator")
+		je = frappe.get_doc("Journal Entry", je.name)
+		je.user_remark = "re-saved by Administrator"
+		je.save()
+		found = self.override_comments(je)
+		self.assertEqual(len(found), 2, found)
+		self.assertTrue(any("Administrator" in c for c in found))
+
+	def test_an_earlier_days_comment_does_not_count(self):
+		je = journal_entry(SYSTEM_MANAGER, add_days(nowdate(), -1))
+		[name] = frappe.get_all(
+			"Comment",
+			filters={"reference_doctype": "Journal Entry", "reference_name": je.name, "content": ["like", "Posting date override:%"]},
+			pluck="name",
+		)
+		frappe.db.set_value("Comment", name, "creation", add_days(nowdate(), -1), update_modified=False)
+		with as_user(SYSTEM_MANAGER):
+			je = frappe.get_doc("Journal Entry", je.name)
+			je.save()
+		self.assertEqual(len(self.override_comments(je)), 2)

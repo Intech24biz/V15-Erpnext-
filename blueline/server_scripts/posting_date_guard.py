@@ -1,6 +1,6 @@
 import frappe
 from frappe import _
-from frappe.utils import getdate
+from frappe.utils import getdate, today
 
 
 COMPANY_CONFIG_DOCTYPE = "Company COA Configuration"
@@ -88,7 +88,25 @@ def _override_permitted():
     return bool(EXEMPT_ROLES & set(frappe.get_roles(user)))
 
 
+def _already_recorded_today(doc):
+    """The guard runs on every save, drafts included; one override comment per document per
+    user per day is enough of a trail, so re-saving the same day adds no more."""
+    return frappe.db.exists(
+        "Comment",
+        {
+            "reference_doctype": doc.doctype,
+            "reference_name": doc.name,
+            "comment_type": "Info",
+            "owner": frappe.session.user,
+            "content": ["like", "Posting date override:%"],
+            "creation": [">=", today()],
+        },
+    )
+
+
 def _record_override(doc, company, doc_date, cutoff, date_fieldname):
+    if _already_recorded_today(doc):
+        return
     message = _(
         "Posting date override: {user} saved this {doctype} with {field} = {doc_date} "
         "for company {company}, before the configured earliest allowed posting date "
