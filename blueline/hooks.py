@@ -10,6 +10,10 @@ app_version = app_version
 
 required_apps = ["erpnext"]
 
+# Form scripts. Sales Invoice: Cancel on an invoice with commission entries goes straight to
+# the server, so the user gets the "Issue a Credit Note instead" message (see the file).
+doctype_js = {"Sales Invoice": "public/js/sales_invoice.js"}
+
 # Workflows ("GI ...") and their pending-approval Notifications are deliberately NOT fixtures:
 # Frappe re-imports fixtures with force=True on every bench migrate, which put back the
 # shipped approver roles over any change a System Manager had made on site. They are

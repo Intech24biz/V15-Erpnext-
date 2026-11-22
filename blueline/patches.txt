@@ -7,3 +7,4 @@ blueline.patches.backfill_sent_for_approval_by
 blueline.patches.backfill_commission_approvers
 blueline.patches.add_credit_note_series
 blueline.patches.backfill_original_commission_amount
+blueline.patches.financial_manager_select_sales_person
