@@ -387,3 +387,27 @@ Notes for the editor are marked **[Editor]** and are not part of the manual.
 > Folders for a new fiscal year appear automatically when the accountant creates the Fiscal Year.
 
 **[Editor]** Attachments made before this branch was deployed stay in *Home/Attachments* until an administrator runs the one-off move (`blueline.document_folders.refile_existing_attachments`, dry run first).
+
+---
+
+# Text changes for the release after release-2026-11-02
+
+**Branch:** `fix/petty-cash-and-commission-messages`. Update the manual once this release is deployed.
+
+## Section 5.3: add this paragraph at the end
+
+**New text:**
+
+> If you press **Cancel** on an approved invoice, the system refuses with *Cancel Not Allowed — Issue a Credit Note*, also when the invoice has sales commission entries. Follow 9.10 to issue the Credit Note.
+
+## Section 6: add this paragraph at the end of 6.1
+
+**New text:**
+
+> When a voucher is approved, the system posts it to the voucher's own company. The expense goes to the cost centre chosen on the voucher, or to the company's Default Cost Center if none is chosen; the petty cash account is credited on the company's Default Cost Center. The cost centre on a voucher must belong to the voucher's company. If the company has no Default Cost Center, approval stops with *"Company … has no Default Cost Center, so this Petty Cash Voucher cannot be posted."* Ask the System Manager to set the Default Cost Center on that Company, then approve the voucher again.
+
+## Section 3.4: add this paragraph at the end
+
+**New text:**
+
+> Financial Managers can filter the Sales Commission Entry list by **Matched Sales Person** and **Commission Credited To**, as well as use the Sales Commission Register.
