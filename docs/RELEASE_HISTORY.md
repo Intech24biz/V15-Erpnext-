@@ -4,7 +4,7 @@ Each release is a tag on `main` in https://github.com/Intech24biz/V15-Erpnext-.g
 
 | Release | Commit | Deployed | Rollback point |
 |---|---|---|---|
-| *next* (`fix/petty-cash-and-commission-messages`) | *tag set at deploy* | *date set at deploy* | code `c55b9a9` (release-2026-11-02) + backup `<path filled in at deploy>` |
+| *next* (`fix/petty-cash-and-commission-messages`) | *tag set at deploy* | *date set at deploy* | code `c55b9a9` (release-2026-11-02) + backup `20261123_050021-erpnext_intech24_biz` (copies in `/root/blueline-release-2026-11-23-backup/`) |
 | release-2026-11-02 | `c55b9a9` | 2026-11-03 | code `8a548e5` (release-client-review-1) + backup `20261103_003529-erpnext_intech24_biz` (copies in `/root/blueline-release-2026-11-02-backup/`) |
 | release-client-review-1 | `8a548e5` | 2026-10-29 | code `79615c0` + backup `20261029_081159` |
 
