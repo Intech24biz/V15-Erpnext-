@@ -240,7 +240,7 @@ Notes for the editor are marked **[Editor]** and are not part of the manual.
 >
 > (with the document type, dates and company filled in). Nothing is saved; change the date to the cut-off or later, or ask a System Manager.
 >
-> **Who can override.** Only a user with the **System Manager** role (and the built-in Administrator account) can save a document dated before the cut-off. The save goes through, and the document's timeline gets a comment such as: *"Posting date override: ceo@gen-innov.com saved this Journal Entry with posting_date = 2026-10-31 for company Blueline Enterprises Pvt Ltd, before the configured earliest allowed posting date of 2026-11-01. Allowed because the user holds the System Manager role."* Each override leaves this comment — one per document per person per day, so re-saving the same document the same day doesn't repeat it.
+> **Who can override.** Only a user with the **System Manager** role (and the built-in Administrator account) can save a document dated before the cut-off. The save goes through, and the document's timeline gets a comment such as: *"Posting date override: <user> saved this Journal Entry with posting_date = 2026-10-31 for company Blueline Enterprises Pvt Ltd, before the configured earliest allowed posting date of 2026-11-01. Allowed because the user holds the System Manager role."* Each override leaves this comment — one per document per person per day, so re-saving the same document the same day doesn't repeat it.
 
 **[Editor]** If the manual has an "Accounts setup" or COA console section, add a one-line pointer there to 5.5.
 

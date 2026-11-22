@@ -1,16 +1,16 @@
 # Blueline: release history
 
-Each release is a tag on `main` in https://github.com/Intech24biz/V15-Erpnext-.git. The **rollback point** of a release is the code and database to return to if it has to be undone (procedure in [HANDOVER.md](HANDOVER.md#rollback)).
+Each release is a tag on `main` in https://github.com/Intech24biz/V15-Erpnext-.git. The **rollback point** of a release is the code and database to return to if it has to be undone (procedure in the Technical Handover Document, [BLUELINE_TECHNICAL_HANDOVER.pdf](BLUELINE_TECHNICAL_HANDOVER.pdf), section 14).
 
 | Release | Commit | Deployed | Rollback point |
 |---|---|---|---|
-| *next* (`fix/petty-cash-and-commission-messages`) | *tag set at deploy* | *date set at deploy* | code `c55b9a9` (release-2026-11-02) + backup `20261123_050021-erpnext_intech24_biz` (copies in `/root/blueline-release-2026-11-23-backup/`) |
+| release-2026-11-23 | `4e12923` | 2026-11-23 | code `c55b9a9` (release-2026-11-02) + backup `20261123_050021-erpnext_intech24_biz` (copies in `/root/blueline-release-2026-11-23-backup/`) |
 | release-2026-11-02 | `c55b9a9` | 2026-11-03 | code `8a548e5` (release-client-review-1) + backup `20261103_003529-erpnext_intech24_biz` (copies in `/root/blueline-release-2026-11-02-backup/`) |
 | release-client-review-1 | `8a548e5` | 2026-10-29 | code `79615c0` + backup `20261029_081159` |
 
-## Next release: fixes after the pre-delivery review
+## release-2026-11-23 (`4e12923`)
 
-Branch `fix/petty-cash-and-commission-messages`, from release-2026-11-02 (`c55b9a9`). The deploy migrate runs one new patch.
+Fixes after the pre-delivery review (branch `fix/petty-cash-and-commission-messages`, from release-2026-11-02 `c55b9a9`). The deploy migrate ran one new patch.
 
 - **Petty Cash Voucher approval.** Approving a voucher failed with "Cost Center … does not belong to Company …" when the voucher's company was not the site's default company. The Journal Entry created on approval now takes its cost centre from the voucher's own company: the expense line uses the cost centre chosen on the voucher, or else the company's Default Cost Center; the petty cash line uses the company's Default Cost Center. If the company has no Default Cost Center, approval stops with a message naming the company. A cost centre of another company is refused when the voucher is saved.
 - **Cancel on an approved Sales Invoice with commission.** On an invoice with a Sales Commission Entry, Cancel showed a generic "Cancel All Documents … no permission" dialog. It now shows the same message as on any approved invoice: *Cancel Not Allowed — Issue a Credit Note*.
