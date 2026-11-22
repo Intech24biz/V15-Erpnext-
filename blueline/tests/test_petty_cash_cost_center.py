@@ -3,7 +3,7 @@ whatever the approving user's or the site's default company is; and Financial Ma
 filter commission entries by sales person."""
 
 import frappe
-from frappe.utils import nowdate
+from frappe.utils import getdate, nowdate
 
 from blueline.tests.utils import (
 	COMPANY,
@@ -21,6 +21,18 @@ from blueline.tests.utils import (
 OTHER_COMPANIES = ("General Innovations (Pvt) Ltd", "Global Intech Pte Ltd")
 
 
+def posting_date_for(company):
+	"""Today, or the last day of the company's latest fiscal year if that has already ended
+	(Global Intech's books stop at an earlier year in this data)."""
+	last = frappe.db.sql(
+		"""select max(fy.year_end_date) from `tabFiscal Year` fy
+		left join `tabFiscal Year Company` fyc on fyc.parent = fy.name
+		where fy.disabled = 0 and (fyc.company = %s or fyc.company is null)""",
+		company,
+	)[0][0]
+	return min(getdate(nowdate()), getdate(last)) if last else nowdate()
+
+
 def voucher_for(company, user=GI_TECH):
 	"""Draft Petty Cash Voucher for `company`, with a cash and an expense account of that company."""
 	with as_user(user):
@@ -28,7 +40,7 @@ def voucher_for(company, user=GI_TECH):
 			{
 				"doctype": "Petty Cash Voucher",
 				"company": company,
-				"posting_date": nowdate(),
+				"posting_date": posting_date_for(company),
 				"requested_by": user,
 				"petty_cash_account": frappe.db.get_value(
 					"Account", {"company": company, "account_type": "Cash", "is_group": 0}
@@ -93,7 +105,7 @@ class TestPettyCashCostCenter(BluelineTestCase):
 		workflow(pcv, "Send for Approval", GI_SALES_2)
 		frappe.db.set_value("Company", COMPANY, "cost_center", None)
 		frappe.clear_document_cache("Company", COMPANY)
-		self.assertRefused(lambda: workflow(pcv, "Approve", GI_MANAGEMENT), f"Company {COMPANY} has no Default Cost Center")
+		self.assertRefused(lambda: workflow(pcv, "Approve", GI_MANAGEMENT), f"{COMPANY}</strong> has no Default Cost Center")
 		frappe.clear_document_cache("Company", COMPANY)
 
 	def test_cost_center_of_another_company_is_refused(self):
