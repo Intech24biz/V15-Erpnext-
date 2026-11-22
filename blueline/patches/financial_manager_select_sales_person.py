@@ -31,6 +31,9 @@ def execute():
 		if not (existing.select or existing.read):
 			frappe.db.set_value("Custom DocPerm", existing.name, "select", 1)
 	else:
-		add_permission(DOCTYPE, ROLE, 0, "select")
+		name = add_permission(DOCTYPE, ROLE, 0, "select")
+		# A new Custom DocPerm row has Read ticked by default; this rule is Select only.
+		if name:
+			frappe.db.set_value("Custom DocPerm", name, "read", 0)
 
 	frappe.clear_cache(doctype=DOCTYPE)

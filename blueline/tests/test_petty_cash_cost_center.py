@@ -108,6 +108,8 @@ class TestFinancialManagerSalesPersonFilter(BluelineTestCase):
 		sales_person = frappe.db.get_value("Sales Person", {"is_group": 0})
 		with as_user(FINANCIAL_MANAGER):
 			self.assertTrue(frappe.has_permission("Sales Person", "select"))
+			rule = frappe.db.get_value("Custom DocPerm", {"parent": "Sales Person", "role": "Financial Manager", "permlevel": 0}, ["select", "read"], as_dict=True)
+			self.assertEqual((rule.select, rule.read), (1, 0), "Financial Manager gets Select only on Sales Person")
 			from frappe.client import validate_link
 
 			self.assertEqual(validate_link("Sales Person", sales_person).get("name"), sales_person)
