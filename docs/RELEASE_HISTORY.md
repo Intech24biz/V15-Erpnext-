@@ -4,9 +4,25 @@ Each release is a tag on `main` in https://github.com/Intech24biz/V15-Erpnext-.g
 
 | Release | Commit | Deployed | Rollback point |
 |---|---|---|---|
+| release-2026-11-24 | `3af81ac` | 2026-11-24 | code `6884679` (release-2026-11-23-docs) + backup `20261124_041635-erpnext_intech24_biz` (copies in `/root/blueline-release-2026-11-24-backup/`); no data migration |
 | release-2026-11-23 | `4e12923` | 2026-11-23 | code `c55b9a9` (release-2026-11-02) + backup `20261123_050021-erpnext_intech24_biz` (copies in `/root/blueline-release-2026-11-23-backup/`) |
 | release-2026-11-02 | `c55b9a9` | 2026-11-03 | code `8a548e5` (release-client-review-1) + backup `20261103_003529-erpnext_intech24_biz` (copies in `/root/blueline-release-2026-11-02-backup/`) |
 | release-client-review-1 | `8a548e5` | 2026-10-29 | code `79615c0` + backup `20261029_081159` |
+
+## release-2026-11-24 (`3af81ac`)
+
+Every amount on the custom pages now uses its own company's currency, symbol and number format. This covers:
+- the VAT Dashboard and its export
+- the Sales Commission Register
+- the Business KPI Dashboard
+- My Dashboard
+- the Quotation History Dashboard
+- the commission entry screens and messages
+- Credit Note comments
+
+Where a page covers several companies, it shows one section per currency and never adds different currencies together.
+
+No data migration. Rolling back the code alone is enough: return to `6884679` (release-2026-11-23-docs); the pre-deploy backup set `20261124_041635` is kept in `/root/blueline-release-2026-11-24-backup/`.
 
 ## release-2026-11-23 (`4e12923`)
 
