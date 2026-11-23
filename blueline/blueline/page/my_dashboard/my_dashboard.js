@@ -62,7 +62,6 @@ blueline.MyDashboard = class MyDashboard {
 	}
 
 	render(data) {
-		const currency = data.currency;
 		this.body.empty();
 
 		const draft_total = data.drafts.reduce((sum, d) => sum + d.count, 0);
@@ -73,10 +72,10 @@ blueline.MyDashboard = class MyDashboard {
 		]);
 
 		this.section(__("Waiting for my approval"), () =>
-			this.doc_table(data.waiting_for_me, currency, __("Nothing is waiting for your approval."), true)
+			this.doc_table(data.waiting_for_me, __("Nothing is waiting for your approval."), true)
 		);
 		this.section(__("Sent by me, waiting for approval"), () =>
-			this.doc_table(data.sent_by_me, currency, __("Nothing you sent is waiting."))
+			this.doc_table(data.sent_by_me, __("Nothing you sent is waiting."))
 		);
 		if (data.drafts.length) {
 			this.section(__("My drafts"), () =>
@@ -101,11 +100,11 @@ blueline.MyDashboard = class MyDashboard {
 				this.cards_html([
 					{
 						label: __("Submitted This Month"),
-						value: `${data.quotations.this_month.count} · ${format_currency(data.quotations.this_month.value, currency)}`,
+						value: `${data.quotations.this_month.count} · ${this.money(data.quotations.this_month.amounts)}`,
 					},
 					{
 						label: __("Open (Not Yet Ordered)"),
-						value: `${data.quotations.open.count} · ${format_currency(data.quotations.open.value, currency)}`,
+						value: `${data.quotations.open.count} · ${this.money(data.quotations.open.amounts)}`,
 					},
 				])
 			);
@@ -118,12 +117,12 @@ blueline.MyDashboard = class MyDashboard {
 				)}</div>`;
 			}
 			const sales = this.cards_html([
-				{ label: __("My Net Sales This Month"), value: format_currency(data.sales.this_month, currency) },
-				{ label: __("My Net Sales Fiscal Year to Date"), value: format_currency(data.sales.fy_to_date, currency) },
+				{ label: __("My Net Sales This Month"), value: this.money(data.sales.this_month) },
+				{ label: __("My Net Sales Fiscal Year to Date"), value: this.money(data.sales.fy_to_date) },
 			]);
 			const commission = this.table(data.commission, [
 				{ label: __("Commission (This Fiscal Year)"), html: (r) => __(r.status) },
-				{ label: __("Amount"), html: (r) => format_currency(r.amount, currency), right: true },
+				{ label: __("Amount"), html: (r) => this.money(r.amounts), right: true },
 			]);
 			return `${sales}<div class="mydash-note">${__("Sales Person: {0}", [
 				data.sales_persons.map((p) => frappe.utils.escape_html(p)).join(", "),
@@ -159,7 +158,15 @@ blueline.MyDashboard = class MyDashboard {
 			.join("")}</div>`;
 	}
 
-	doc_table(rows, currency, empty_label, show_sender) {
+	// Totals come per currency ([{currency, amount}]): shown side by side, never added together.
+	money(amounts) {
+		if (!amounts || !amounts.length) {
+			return "—";
+		}
+		return amounts.map((a) => format_currency(a.amount, a.currency)).join(" · ");
+	}
+
+	doc_table(rows, empty_label, show_sender) {
 		if (!rows.length) {
 			return `<div class="mydash-empty">${empty_label}</div>`;
 		}
@@ -180,7 +187,8 @@ blueline.MyDashboard = class MyDashboard {
 		}
 		columns.push(
 			{ label: __("Waiting Since"), html: (r) => frappe.datetime.comment_when(r.modified) },
-			{ label: __("Amount"), html: (r) => format_currency(r.amount, currency), right: true }
+			// Each document in its own company's currency.
+			{ label: __("Amount"), html: (r) => format_currency(r.amount, r.currency), right: true }
 		);
 		return this.table(rows, columns);
 	}

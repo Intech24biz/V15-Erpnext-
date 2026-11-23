@@ -2,6 +2,8 @@ import frappe
 from frappe import _
 from frappe.utils import flt, fmt_money, now_datetime
 
+from blueline.money import format_company_money
+
 from blueline.blueline.doctype.sales_commission_entry.sales_commission_entry import (
 	CREDIT_NOTE_ADJUSTMENT_FLAG,
 	DEDUCTION_NOT_PAYABLE,
@@ -557,7 +559,7 @@ def _adjust_entry(entry, credit_note, returned_amount):
 		deduction = _create_deduction(entry, credit_note, returned_now, adjustment)
 		row.update(adjustment_type=DEDUCTION_CREATED, deduction_entry=deduction.name)
 		comment = _("Commission already paid: Deduction {0} of {1} created by Credit Note {2}.").format(
-			deduction.name, fmt_money(adjustment, precision), credit_note.name
+			deduction.name, format_company_money(adjustment, entry.company), credit_note.name
 		)
 	elif full_return:
 		entry.commission_amount = 0
@@ -568,7 +570,7 @@ def _adjust_entry(entry, credit_note, returned_amount):
 		entry.commission_amount = flt(flt(entry.commission_amount) - adjustment, precision)
 		row.update(adjustment_type=REDUCED)
 		comment = _("Commission reduced by {0} by Credit Note {1}.").format(
-			fmt_money(adjustment, precision), credit_note.name
+			format_company_money(adjustment, entry.company), credit_note.name
 		)
 
 	row.update(amount_after=entry.commission_amount, status_after=entry.status)

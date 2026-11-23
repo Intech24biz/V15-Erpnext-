@@ -161,6 +161,11 @@ blueline.VatDashboard = class VatDashboard {
 		});
 	}
 
+	// The selected company's currency, as sent with the data (never the site default).
+	currency() {
+		return this.data && this.data.currency;
+	}
+
 	get_card_summary(data) {
 		return this.show_raw ? data.raw_summary : data.summary;
 	}
@@ -201,7 +206,7 @@ blueline.VatDashboard = class VatDashboard {
 	}
 
 	render_cards(summary) {
-		const currency = frappe.defaults.get_default("currency");
+		const currency = this.currency();
 		const net_is_refund = summary.net_vat < 0;
 		const net_label = net_is_refund ? __("Net VAT Refund") : __("Net VAT Payable");
 		const net_value = net_is_refund
@@ -240,7 +245,7 @@ blueline.VatDashboard = class VatDashboard {
 			$el.hide();
 			return;
 		}
-		const currency = frappe.defaults.get_default("currency");
+		const currency = this.currency();
 		$(`
 			<div class="vatd-discrepancies-title">
 				${__("Ledger discrepancies: {0} VAT account(s) with a wrong-direction balance", [rows.length])}
@@ -301,7 +306,7 @@ blueline.VatDashboard = class VatDashboard {
 	}
 
 	render_monthly_table(rows) {
-		const currency = frappe.defaults.get_default("currency");
+		const currency = this.currency();
 		const $el = this.body.find(".vatd-monthly-table").empty();
 		if (!rows || !rows.length) {
 			$el.html(`<div class="text-muted">${__("No Data")}</div>`);
@@ -358,7 +363,14 @@ blueline.VatDashboard = class VatDashboard {
 			return;
 		}
 
-		const header = [__("Month"), __("Output VAT"), __("Input VAT"), __("Net VAT")];
+		// Amounts are exported as plain numbers in the company's currency, named in the headers.
+		const cur = this.currency();
+		const header = [
+			__("Month"),
+			`${__("Output VAT")} (${cur})`,
+			`${__("Input VAT")} (${cur})`,
+			`${__("Net VAT")} (${cur})`,
+		];
 		const csv_rows = [header];
 
 		let total_output = 0;
@@ -376,7 +388,7 @@ blueline.VatDashboard = class VatDashboard {
 		const discrepancies = (this.data && this.data.discrepancies) || [];
 		if (discrepancies.length) {
 			csv_rows.push([]);
-			csv_rows.push([__("Ledger discrepancies"), __("Type"), __("Balance"), __("Amount")]);
+			csv_rows.push([__("Ledger discrepancies"), __("Type"), __("Balance"), `${__("Amount")} (${cur})`]);
 			discrepancies.forEach((row) => {
 				csv_rows.push([
 					row.account,

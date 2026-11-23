@@ -9,6 +9,7 @@ from frappe.model.workflow import get_workflow_name
 from frappe.utils import flt, get_first_day, getdate, nowdate
 
 from blueline.blueline.page.business_kpi_dashboard.business_kpi_dashboard import _fiscal_year_range
+from blueline.money import amounts_by_currency, company_currency
 from blueline.server_scripts.self_approval import APPROVAL_DOCTYPES, PENDING_APPROVAL_STATE, SENT_BY_FIELD
 
 APPROVE_ACTION = "Approve"
@@ -49,6 +50,8 @@ def _rows(doctype, filters):
 	rows = frappe.get_list(doctype, filters=filters, fields=fields, order_by="modified asc", limit_page_length=LIST_LIMIT)
 	for row in rows:
 		row.doctype = doctype
+		# The amount is in company currency: shown in that company's currency.
+		row.currency = company_currency(row.company)
 	return rows
 
 
@@ -108,10 +111,17 @@ def my_quotations(user):
 	month_start = get_first_day(nowdate())
 
 	def total(filters):
-		row = frappe.get_list(
-			"Quotation", filters=filters, fields=["count(name) as count", "sum(base_net_total) as total"]
-		)[0]
-		return {"count": row.count or 0, "value": flt(row.total, 2)}
+		# Per company, then per currency: amounts in different currencies are never added.
+		rows = frappe.get_list(
+			"Quotation",
+			filters=filters,
+			fields=["company", "count(name) as count", "sum(base_net_total) as total"],
+			group_by="company",
+		)
+		return {
+			"count": sum(r.count or 0 for r in rows),
+			"amounts": amounts_by_currency([{"company": r.company, "amount": flt(r.total, 2)} for r in rows]),
+		}
 
 	return {
 		"this_month": total({"owner": user, "docstatus": 1, "transaction_date": [">=", month_start]}),
@@ -132,16 +142,17 @@ def my_sales(sales_persons):
 	fy_start, _fy_end = _fiscal_year_range(None)
 
 	def allocated(start):
-		return flt(
-			frappe.db.sql(
-				"""select sum(st.allocated_amount * si.conversion_rate)
-				from `tabSales Team` st join `tabSales Invoice` si on si.name = st.parent
-				where st.parenttype = 'Sales Invoice' and si.docstatus = 1
-					and st.sales_person in %(persons)s and si.posting_date between %(start)s and %(end)s""",
-				{"persons": sales_persons, "start": start, "end": today},
-			)[0][0],
-			2,
+		# In company currency, per company, then added up per currency only.
+		rows = frappe.db.sql(
+			"""select si.company, sum(st.allocated_amount * si.conversion_rate) as amount
+			from `tabSales Team` st join `tabSales Invoice` si on si.name = st.parent
+			where st.parenttype = 'Sales Invoice' and si.docstatus = 1
+				and st.sales_person in %(persons)s and si.posting_date between %(start)s and %(end)s
+			group by si.company""",
+			{"persons": sales_persons, "start": start, "end": today},
+			as_dict=True,
 		)
+		return amounts_by_currency(rows)
 
 	return {"this_month": allocated(get_first_day(today)), "fy_to_date": allocated(fy_start)}
 
@@ -159,11 +170,12 @@ def my_commission(sales_persons):
 			"posting_date": ["between", [fy_start, fy_end]],
 			"status": ["in", COMMISSION_STATUSES],
 		},
-		fields=["status", "sum(commission_amount) as total"],
-		group_by="status",
+		fields=["status", "company", "sum(commission_amount) as amount"],
+		group_by="status, company",
 	)
-	by_status = {r.status: flt(r.total, 2) for r in rows}
-	return [{"status": s, "amount": by_status.get(s, 0.0)} for s in COMMISSION_STATUSES]
+	return [
+		{"status": s, "amounts": amounts_by_currency([r for r in rows if r.status == s])} for s in COMMISSION_STATUSES
+	]
 
 
 @frappe.whitelist()
@@ -182,5 +194,4 @@ def get_my_dashboard():
 		"sales_persons": sales_persons,
 		"sales": my_sales(sales_persons) if sales_persons else None,
 		"commission": my_commission(sales_persons) if sales_persons else None,
-		"currency": frappe.db.get_default("currency"),
 	}

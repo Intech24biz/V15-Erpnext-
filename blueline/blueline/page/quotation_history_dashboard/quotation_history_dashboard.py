@@ -6,6 +6,8 @@ from frappe.query_builder import Order
 from frappe.query_builder.functions import Avg, Count, Sum
 from frappe.utils import flt, getdate
 
+from blueline.money import currency_sections
+
 WON_STATUSES = ("Ordered", "Partially Ordered")
 LOST_STATUSES = ("Lost", "Cancelled", "Expired")
 
@@ -16,8 +18,11 @@ def _check_permission():
 
 
 def _apply_filters(query, qh, filters):
-	if filters.get("company"):
-		query = query.where(qh.company == filters["company"])
+	company = filters.get("company")
+	if isinstance(company, (list, tuple)):
+		query = query.where(qh.company.isin(list(company) or [""]))
+	elif company:
+		query = query.where(qh.company == company)
 	if filters.get("from_date"):
 		query = query.where(qh.transaction_date >= getdate(filters["from_date"]))
 	if filters.get("to_date"):
@@ -31,12 +36,17 @@ def _apply_filters(query, qh, filters):
 def get_dashboard_data(company=None, from_date=None, to_date=None, status=None):
 	_check_permission()
 
-	filters = {
-		"company": company,
-		"from_date": from_date,
-		"to_date": to_date,
-		"status": status,
-	}
+	# Values are in company currency (base_*): one section per currency, never added across.
+	companies = [company] if company else frappe.get_all("Quotation History", distinct=True, pluck="company")
+	companies = [c for c in companies if c]
+
+	def build(scope):
+		return _dashboard({"company": scope, "from_date": from_date, "to_date": to_date, "status": status})
+
+	return currency_sections(companies, build)
+
+
+def _dashboard(filters):
 
 	qh = frappe.qb.DocType("Quotation History")
 
@@ -125,11 +135,12 @@ def get_dashboard_data(company=None, from_date=None, to_date=None, status=None):
 			qhi.item_code,
 			qhi.item_name,
 			Sum(qhi.qty).as_("total_qty"),
-			Sum(qhi.amount).as_("total_value"),
+			# Item amounts are in the quotation's own currency: convert to company currency.
+			Sum(qhi.amount * qh.conversion_rate).as_("total_value"),
 			Count(qhi.parent).distinct().as_("quotation_count"),
 		)
 		.groupby(qhi.item_code, qhi.item_name)
-		.orderby(Sum(qhi.amount), order=Order.desc)
+		.orderby(Sum(qhi.amount * qh.conversion_rate), order=Order.desc)
 		.limit(10),
 		qh,
 		filters,

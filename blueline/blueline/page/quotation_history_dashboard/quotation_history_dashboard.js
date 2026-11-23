@@ -113,8 +113,9 @@ blueline.QuotationHistoryDashboard = class QuotationHistoryDashboard {
 			</style>`).appendTo("head");
 		}
 
-		this.body = $(`
-			<div class="quotation-history-dashboard">
+		// One copy of this layout per currency section (see render).
+		this.root = $(`<div class="quotation-history-dashboard"></div>`).appendTo(this.page.body);
+		this.template = `
 				<div class="row qhd-cards"></div>
 				<div class="row qhd-charts">
 					<div class="col-md-6">
@@ -146,8 +147,7 @@ blueline.QuotationHistoryDashboard = class QuotationHistoryDashboard {
 						<div class="qhd-top-items"></div>
 					</div>
 				</div>
-			</div>
-		`).appendTo(this.page.body);
+		`;
 	}
 
 	refresh() {
@@ -164,17 +164,32 @@ blueline.QuotationHistoryDashboard = class QuotationHistoryDashboard {
 		});
 	}
 
+	// The server answers with one section per currency: companies in different currencies are
+	// never added together. Each section is drawn with its own copy of the layout.
 	render(data) {
-		this.render_cards(data.summary);
-		this.render_status_chart(data.status_breakdown);
-		this.render_trend_chart(data.monthly_trend);
-		this.render_top_customers(data.top_customers);
-		this.render_company_breakdown(data.company_breakdown);
-		this.render_top_items(data.top_items);
+		const sections = data.sections && data.sections.length ? data.sections : [data];
+		this.root.empty();
+		sections.forEach((section) => {
+			this.body = $(`<div class="qhd-currency-section"></div>`).appendTo(this.root);
+			if (sections.length > 1) {
+				$(`<div class="qhd-chart-title qhd-currency-heading">${__("{0}: {1}", [
+					frappe.utils.escape_html(section.currency),
+					frappe.utils.escape_html((section.companies || []).join(", ")),
+				])}</div>`).appendTo(this.body);
+			}
+			this.body.append(this.template);
+			this.currency_code = section.currency;
+			this.render_cards(section.summary);
+			this.render_status_chart(section.status_breakdown);
+			this.render_trend_chart(section.monthly_trend);
+			this.render_top_customers(section.top_customers);
+			this.render_company_breakdown(section.company_breakdown);
+			this.render_top_items(section.top_items);
+		});
 	}
 
 	render_cards(summary) {
-		const currency = frappe.defaults.get_default("currency");
+		const currency = this.currency_code;
 		const cards = [
 			{ label: __("Total Quotations"), value: summary.total_quotations },
 			{ label: __("Total Value"), value: format_currency(summary.total_value, currency) },
@@ -237,7 +252,7 @@ blueline.QuotationHistoryDashboard = class QuotationHistoryDashboard {
 	}
 
 	render_top_customers(rows) {
-		const currency = frappe.defaults.get_default("currency");
+		const currency = this.currency_code;
 		const $el = this.body.find(".qhd-top-customers").empty();
 		if (!rows || !rows.length) {
 			$el.html(`<div class="text-muted">${__("No Data")}</div>`);
@@ -273,7 +288,7 @@ blueline.QuotationHistoryDashboard = class QuotationHistoryDashboard {
 	}
 
 	render_top_items(rows) {
-		const currency = frappe.defaults.get_default("currency");
+		const currency = this.currency_code;
 		const $chart = this.body.find(".qhd-top-items-chart").empty();
 		const $el = this.body.find(".qhd-top-items").empty();
 		if (!rows || !rows.length) {
@@ -336,7 +351,7 @@ blueline.QuotationHistoryDashboard = class QuotationHistoryDashboard {
 	}
 
 	render_company_breakdown(rows) {
-		const currency = frappe.defaults.get_default("currency");
+		const currency = this.currency_code;
 		const $el = this.body.find(".qhd-company-breakdown").empty();
 		if (!rows || !rows.length) {
 			$el.html(`<div class="text-muted">${__("No Data")}</div>`);

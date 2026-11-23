@@ -168,7 +168,6 @@ blueline.SalesCommissionRegister = class SalesCommissionRegister {
 	}
 
 	render_deductions(deductions) {
-		const currency = frappe.defaults.get_default("currency");
 		const $el = this.body.find(".scr-deductions").empty();
 		if (!deductions || !deductions.length) {
 			return;
@@ -206,6 +205,8 @@ blueline.SalesCommissionRegister = class SalesCommissionRegister {
 		const $tbody = table.find("tbody");
 
 		deductions.forEach((row) => {
+			// Each person's deductions belong to one company: shown in that company's currency.
+			const currency = row.currency;
 			const links = row.entries
 				.map(
 					(e) =>
@@ -228,17 +229,20 @@ blueline.SalesCommissionRegister = class SalesCommissionRegister {
 	}
 
 	render_summary(summary, status_options) {
-		const currency = frappe.defaults.get_default("currency");
 		const $summary = this.body.find(".scr-summary").empty();
 
 		status_options.forEach((status) => {
-			const bucket = summary[status] || { count: 0, commission_amount: 0 };
+			const bucket = summary[status] || { count: 0, amounts: [] };
+			// One line per currency: amounts of companies in different currencies are never added.
+			const amounts = (bucket.amounts || []).length
+				? bucket.amounts.map((a) => `<div>${format_currency(a.amount, a.currency)}</div>`).join("")
+				: `<div>—</div>`;
 			$(`
 				<div class="col-md-2 col-sm-4">
 					<div class="scr-summary-card">
 						<div class="scr-summary-label">${__(status)}</div>
 						<div class="scr-summary-count">${bucket.count}</div>
-						<div class="scr-summary-amount">${format_currency(bucket.commission_amount, currency)}</div>
+						<div class="scr-summary-amount">${amounts}</div>
 					</div>
 				</div>
 			`).appendTo($summary);
@@ -258,7 +262,6 @@ blueline.SalesCommissionRegister = class SalesCommissionRegister {
 	}
 
 	render_table(rows) {
-		const currency = frappe.defaults.get_default("currency");
 		const $el = this.body.find(".scr-table-wrapper").empty();
 
 		if (!rows || !rows.length) {
@@ -292,6 +295,8 @@ blueline.SalesCommissionRegister = class SalesCommissionRegister {
 		const $tbody = table.find("tbody");
 
 		rows.forEach((row) => {
+			// Each entry in its own company's currency.
+			const currency = row.currency;
 			const adjusted =
 				row.entry_type !== "Deduction" &&
 				row.original_commission_amount &&

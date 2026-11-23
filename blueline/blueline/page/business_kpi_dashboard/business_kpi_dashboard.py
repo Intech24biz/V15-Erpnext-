@@ -1,6 +1,10 @@
 """Management dashboard: sales performance, financial health and commission, per company or
 for every company the user can see. Management roles only (also enforced here, not just on
-the Page). Amounts are in company currency; sales are net of VAT (base_net_total)."""
+the Page). Amounts are in company currency; sales are net of VAT (base_net_total).
+
+Companies with different currencies are never added together: every endpoint answers with one
+section per currency (blueline.money.currency_sections), each covering only the companies in
+that currency. With one company, or one currency, the response is a single section."""
 
 import frappe
 from frappe import _
@@ -10,6 +14,7 @@ from erpnext.accounts.utils import get_fiscal_year
 
 # Reused, not duplicated: the VAT Dashboard's own figures and discrepancy check.
 from blueline.blueline.page.vat_dashboard.vat_dashboard import get_vat_data
+from blueline.money import currency_sections
 
 # Not ERPNext's Accounts Manager: on this site it is also held by sales staff.
 MANAGEMENT_ROLES = {"System Manager", "GI Management", "Financial Manager"}
@@ -45,8 +50,20 @@ def _readable(doctype):
 	return frappe.has_permission(doctype, "read")
 
 
-def _company_filter(company):
-	return {"company": company} if company else {}
+def _company_filter(scope):
+	"""`scope`: one company, a list of companies (one currency section), or None for all."""
+	if scope is None:
+		return {}
+	if isinstance(scope, str):
+		return {"company": scope}
+	return {"company": ["in", list(scope) or [""]]}
+
+
+def _fy_company(scope):
+	"""The company whose fiscal year applies: the only one in the scope, else none (default)."""
+	if isinstance(scope, str):
+		return scope
+	return scope[0] if scope and len(scope) == 1 else None
 
 
 def _permitted_companies(company=None):
@@ -64,12 +81,6 @@ def _fiscal_year_range(company, date=None):
 	except Exception:
 		# Fiscal Year setup incomplete for this company: plain calendar year instead.
 		return getdate(f"{date.year}-01-01"), getdate(f"{date.year}-12-31")
-
-
-def _currency(company):
-	if company:
-		return frappe.get_cached_value("Company", company, "default_currency")
-	return frappe.db.get_default("currency")
 
 
 def _sum(doctype, field, filters):
@@ -116,18 +127,21 @@ def _quotation_kpis(company, start, end):
 def get_sales_performance(company=None):
 	check_management()
 	frappe.has_permission(SALES_INVOICE_DT, "read", throw=True)
+	return currency_sections(_permitted_companies(company), _sales_performance)
 
+
+def _sales_performance(scope):
 	today = getdate(nowdate())
-	fy_start, fy_end = _fiscal_year_range(company)
+	fy_start, fy_end = _fiscal_year_range(_fy_company(scope))
 
 	kpis = {
-		"this_month": _net_sales(company, get_first_day(today), today),
+		"this_month": _net_sales(scope, get_first_day(today), today),
 		"last_month": _net_sales(
-			company, get_first_day(add_months(today, -1)), get_last_day(add_months(today, -1))
+			scope, get_first_day(add_months(today, -1)), get_last_day(add_months(today, -1))
 		),
-		"fy_to_date": _net_sales(company, fy_start, today),
-		"last_fy_to_date": _net_sales(company, add_years(fy_start, -1), add_years(today, -1)),
-		"quotations": _quotation_kpis(company, fy_start, today),
+		"fy_to_date": _net_sales(scope, fy_start, today),
+		"last_fy_to_date": _net_sales(scope, add_years(fy_start, -1), add_years(today, -1)),
+		"quotations": _quotation_kpis(scope, fy_start, today),
 	}
 
 	trend = frappe.get_list(
@@ -135,14 +149,14 @@ def get_sales_performance(company=None):
 		filters={
 			"docstatus": 1,
 			"posting_date": [">=", get_first_day(add_months(today, -11))],
-			**_company_filter(company),
+			**_company_filter(scope),
 		},
 		fields=["DATE_FORMAT(posting_date, '%Y-%m') as month", "sum(base_net_total) as total"],
 		group_by="month",
 		order_by="month asc",
 	)
 
-	fy_filters = {"docstatus": 1, "posting_date": ["between", [fy_start, fy_end]], **_company_filter(company)}
+	fy_filters = {"docstatus": 1, "posting_date": ["between", [fy_start, fy_end]], **_company_filter(scope)}
 	top_customers = frappe.get_list(
 		SALES_INVOICE_DT,
 		filters=fy_filters,
@@ -182,7 +196,6 @@ def get_sales_performance(company=None):
 		"top_items": top_items,
 		"revenue_by_company": revenue_by_company,
 		"fiscal_year_range": [str(fy_start), str(fy_end)],
-		"currency": _currency(company),
 	}
 
 
@@ -296,15 +309,16 @@ def _petty_cash(company):
 def get_financial_health(company=None):
 	check_management()
 	frappe.has_permission("GL Entry", "read", throw=True)
+	return currency_sections(_permitted_companies(company), _financial_health)
 
-	companies = _permitted_companies(company)
+
+def _financial_health(scope):
 	return {
-		"receivables": _outstanding(SALES_INVOICE_DT, company),
-		"payables": _outstanding(PURCHASE_INVOICE_DT, company),
-		"cash_and_bank": _cash_and_bank(companies),
-		"vat_position": _vat_position(companies),
-		"petty_cash": _petty_cash(company),
-		"currency": _currency(company),
+		"receivables": _outstanding(SALES_INVOICE_DT, scope),
+		"payables": _outstanding(PURCHASE_INVOICE_DT, scope),
+		"cash_and_bank": _cash_and_bank(scope),
+		"vat_position": _vat_position(scope),
+		"petty_cash": _petty_cash(scope),
 	}
 
 
@@ -317,9 +331,12 @@ def get_financial_health(company=None):
 def get_commission_payroll(company=None):
 	check_management()
 	frappe.has_permission(COMMISSION_ENTRY_DT, "read", throw=True)
+	return currency_sections(_permitted_companies(company), _commission_payroll)
 
+
+def _commission_payroll(scope):
 	today = getdate(nowdate())
-	commission = {"entry_type": COMMISSION_TYPE, "docstatus": 1, **_company_filter(company)}
+	commission = {"entry_type": COMMISSION_TYPE, "docstatus": 1, **_company_filter(scope)}
 
 	status_by_company = frappe.get_list(
 		COMMISSION_ENTRY_DT,
@@ -332,7 +349,7 @@ def get_commission_payroll(company=None):
 		group_by="company, status",
 	)
 
-	fy_start, fy_end = _fiscal_year_range(company)
+	fy_start, fy_end = _fiscal_year_range(_fy_company(scope))
 	top_salespeople = frappe.get_list(
 		COMMISSION_ENTRY_DT,
 		filters={**commission, "posting_date": ["between", [fy_start, fy_end]], "status": ["in", EARNED_STATUSES]},
@@ -344,7 +361,7 @@ def get_commission_payroll(company=None):
 
 	pending_by_company = frappe.get_list(
 		COMMISSION_ENTRY_DT,
-		filters={"status": PENDING_APPROVAL_STATUS, "docstatus": 1, **_company_filter(company)},
+		filters={"status": PENDING_APPROVAL_STATUS, "docstatus": 1, **_company_filter(scope)},
 		fields=["company", "count(name) as count"],
 		group_by="company",
 	)
@@ -362,9 +379,8 @@ def get_commission_payroll(company=None):
 				"entry_type": DEDUCTION_TYPE,
 				"docstatus": 1,
 				"status": ["not in", SETTLED_DEDUCTION_STATUSES],
-				**_company_filter(company),
+				**_company_filter(scope),
 			},
 		),
 		"fiscal_year_range": [str(fy_start), str(fy_end)],
-		"currency": _currency(company),
 	}

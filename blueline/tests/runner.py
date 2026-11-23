@@ -34,6 +34,7 @@ SUITES = (
 	"test_kpi_dashboards",
 	"test_document_folders",
 	"test_petty_cash_cost_center",
+	"test_company_currency",
 )
 
 

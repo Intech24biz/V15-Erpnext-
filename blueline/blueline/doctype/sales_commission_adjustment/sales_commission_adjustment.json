@@ -48,7 +48,8 @@
    "fieldname": "returned_amount",
    "fieldtype": "Currency",
    "label": "Returned Line Amount",
-   "read_only": 1
+   "read_only": 1,
+   "options": "Company:company:default_currency"
   },
   {
    "columns": 2,
@@ -57,7 +58,8 @@
    "fieldtype": "Currency",
    "in_list_view": 1,
    "label": "Commission Adjusted",
-   "read_only": 1
+   "read_only": 1,
+   "options": "Company:company:default_currency"
   },
   {
    "fieldname": "column_break_1",
@@ -67,13 +69,15 @@
    "fieldname": "amount_before",
    "fieldtype": "Currency",
    "label": "Commission Before",
-   "read_only": 1
+   "read_only": 1,
+   "options": "Company:company:default_currency"
   },
   {
    "fieldname": "amount_after",
    "fieldtype": "Currency",
    "label": "Commission After",
-   "read_only": 1
+   "read_only": 1,
+   "options": "Company:company:default_currency"
   },
   {
    "fieldname": "status_before",
@@ -145,7 +149,7 @@
  "index_web_pages_for_search": 0,
  "istable": 1,
  "links": [],
- "modified": "2026-10-29 00:00:00.000000",
+ "modified": "2026-11-24 09:00:00.000000",
  "modified_by": "Administrator",
  "module": "Blueline",
  "name": "Sales Commission Adjustment",

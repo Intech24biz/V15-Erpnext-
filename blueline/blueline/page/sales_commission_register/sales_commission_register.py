@@ -3,6 +3,7 @@ from frappe import _
 from frappe.utils import flt, getdate
 
 from blueline.blueline.doctype.sales_commission_entry.sales_commission_entry import APPROVED_STATUS, fit_deductions
+from blueline.money import company_currency
 
 DOCTYPE = "Sales Commission Entry"
 
@@ -87,13 +88,20 @@ def get_entries(
 
 	# Deductions are money owed back, not commission earned: they're kept out of the status
 	# totals (which would otherwise net them silently) and shown as their own balance.
-	summary = {s: {"count": 0, "commission_amount": 0.0} for s in STATUS_OPTIONS}
+	# Each entry is in its company's currency; totals are kept per currency and never added
+	# across currencies. `commission_amount` is the total only when one currency is involved.
+	summary = {s: {"count": 0, "commission_amount": 0.0, "by_currency": {}} for s in STATUS_OPTIONS}
 	for entry in entries:
+		entry.currency = company_currency(entry.company)
 		if entry.entry_type == DEDUCTION_TYPE:
 			continue
-		bucket = summary.setdefault(entry.status, {"count": 0, "commission_amount": 0.0})
+		bucket = summary.setdefault(entry.status, {"count": 0, "commission_amount": 0.0, "by_currency": {}})
 		bucket["count"] += 1
-		bucket["commission_amount"] += entry.commission_amount or 0.0
+		bucket["by_currency"][entry.currency] = bucket["by_currency"].get(entry.currency, 0.0) + (entry.commission_amount or 0.0)
+	for bucket in summary.values():
+		by_currency = bucket.pop("by_currency")
+		bucket["amounts"] = [{"currency": c, "amount": by_currency[c]} for c in sorted(by_currency)]
+		bucket["commission_amount"] = bucket["amounts"][0]["amount"] if len(bucket["amounts"]) == 1 else (0.0 if not by_currency else None)
 
 	return {
 		"entries": entries,
@@ -141,6 +149,7 @@ def get_outstanding_deductions(matched_sales_person=None, commission_credited_to
 			{
 				"commission_credited_to": row.commission_credited_to,
 				"company": row.company,
+				"currency": company_currency(row.company),
 				"amount": 0.0,
 				"awaiting_approval_amount": 0.0,
 				"next_payout_amount": 0.0,

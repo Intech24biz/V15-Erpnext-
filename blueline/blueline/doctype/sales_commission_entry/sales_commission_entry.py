@@ -4,6 +4,8 @@ from frappe.model.document import Document
 from frappe.model.meta import get_field_precision
 from frappe.utils import cint, cstr, flt
 
+from blueline.money import format_company_money
+
 PENDING_APPROVAL_STATUS = "Payment Received - Pending Approval"
 APPROVED_STATUS = "Approved"
 PAID_STATUS = "Paid"
@@ -187,7 +189,7 @@ class SalesCommissionEntry(Document):
 				_(
 					"Select the {0} that paid this commission out before marking it Paid. It can only be "
 					"left empty when Approved deductions take off the whole commission (net {1})."
-				).format(frappe.bold(_("Payment Entry")), frappe.format_value(0, {"fieldtype": "Currency"})),
+				).format(frappe.bold(_("Payment Entry")), format_company_money(0, self.company)),
 				title=_("Payment Entry Required"),
 			)
 		if not self.payment_entry:
@@ -242,11 +244,12 @@ class SalesCommissionEntry(Document):
 					"and the deductions taken off with it ({4}) would make {5}, more than was paid."
 				).format(
 					frappe.bold(pe.name),
-					frappe.format_value(pe.base_paid_amount, {"fieldtype": "Currency"}),
-					frappe.format_value(others, {"fieldtype": "Currency"}),
-					frappe.format_value(self.commission_amount, {"fieldtype": "Currency"}),
-					frappe.format_value(deducted, {"fieldtype": "Currency"}),
-					frappe.format_value(linked, {"fieldtype": "Currency"}),
+					# In the company's currency (the payout's company is checked to match above).
+					format_company_money(pe.base_paid_amount, self.company),
+					format_company_money(others, self.company),
+					format_company_money(self.commission_amount, self.company),
+					format_company_money(deducted, self.company),
+					format_company_money(linked, self.company),
 				),
 				title=_("Payment Entry Overspent"),
 			)

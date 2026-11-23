@@ -4,6 +4,8 @@ import frappe
 from frappe import _
 from frappe.utils import flt, getdate
 
+from blueline.money import company_currency
+
 OUTPUT_ROOT_TYPE = "Liability"
 INPUT_ROOT_TYPE = "Asset"
 SVAT_ROOT_TYPE = "Income"
@@ -91,6 +93,8 @@ def get_vat_data(company, from_date=None, to_date=None):
 		"monthly": [],
 		"account_detail": [],
 		"discrepancies": [],
+		# GL amounts are in company currency: shown in the selected company's currency.
+		"currency": company_currency(company),
 	}
 	if not accounts:
 		return empty_result
@@ -198,6 +202,7 @@ def get_vat_data(company, from_date=None, to_date=None):
 		"monthly": monthly,
 		"account_detail": account_detail,
 		"discrepancies": get_discrepancies(account_detail),
+		"currency": empty_result["currency"],
 	}
 
 

@@ -68,6 +68,17 @@ blueline.BusinessKpiDashboard = class BusinessKpiDashboard {
 				}
 				.bkpi .bkpi-tab-panel[hidden] { display: none; }
 				.bkpi .bkpi-section { margin-bottom: 25px; }
+				.bkpi .bkpi-currency-section + .bkpi-currency-section {
+					border-top: 1px solid var(--border-color);
+					padding-top: 20px;
+					margin-top: 10px;
+				}
+				.bkpi .bkpi-currency-heading {
+					font-weight: 600;
+					font-size: 15px;
+					margin-bottom: 12px;
+					color: var(--text-color);
+				}
 				.bkpi .bkpi-section-title {
 					font-weight: 600;
 					margin-bottom: 10px;
@@ -157,14 +168,13 @@ blueline.BusinessKpiDashboard = class BusinessKpiDashboard {
 		loaders[this.active_tab]();
 	}
 
-	call(method, panel_selector, render_fn) {
+	call(method, $panel, template, render_fn) {
 		const me = this;
 		const company = this.get_company();
 		const cache_key = `${method}:${company || ""}`;
 
 		if (this.cache[cache_key]) {
-			this.response_currency = this.cache[cache_key].currency;
-			render_fn(this.cache[cache_key]);
+			this.render_sections($panel, template, this.cache[cache_key], render_fn);
 			return;
 		}
 
@@ -175,10 +185,28 @@ blueline.BusinessKpiDashboard = class BusinessKpiDashboard {
 			callback(r) {
 				if (r.message) {
 					me.cache[cache_key] = r.message;
-					me.response_currency = r.message.currency;
-					render_fn(r.message);
+					me.render_sections($panel, template, r.message, render_fn);
 				}
 			},
+		});
+	}
+
+	// The server answers with one section per currency (companies in different currencies are
+	// never added together). Each section gets its own copy of the tab, in its own currency.
+	render_sections($panel, template, data, render_fn) {
+		const sections = data.sections && data.sections.length ? data.sections : [data];
+		$panel.empty();
+		sections.forEach((section) => {
+			const $sec = $(`<div class="bkpi-currency-section"></div>`).appendTo($panel);
+			if (sections.length > 1) {
+				$(`<div class="bkpi-currency-heading">${__("{0}: {1}", [
+					frappe.utils.escape_html(section.currency),
+					frappe.utils.escape_html((section.companies || []).join(", ")),
+				])}</div>`).appendTo($sec);
+			}
+			$sec.append(template);
+			this.response_currency = section.currency;
+			render_fn($sec, section);
 		});
 	}
 
@@ -192,8 +220,7 @@ blueline.BusinessKpiDashboard = class BusinessKpiDashboard {
 
 	load_sales_performance() {
 		const $panel = this.body.find('[data-panel="sales"]');
-		if (!$panel.find(".bkpi-initialized").length) {
-			$panel.html(`
+		const template = `
 				<div class="bkpi-initialized"></div>
 				<div class="bkpi-section-note">${__("Net sales: excluding VAT, in company currency, Credit Notes deducted.")}</div>
 				<div class="row bkpi-cards bkpi-sales-kpis"></div>
@@ -215,10 +242,9 @@ blueline.BusinessKpiDashboard = class BusinessKpiDashboard {
 					<div class="bkpi-section-title">${__("Revenue by Company (This Fiscal Year)")}</div>
 					<div class="bkpi-revenue-by-company"></div>
 				</div>
-			`);
-		}
+			`;
 
-		this.call("get_sales_performance", $panel, (data) => this.render_sales_performance($panel, data));
+		this.call("get_sales_performance", $panel, template, ($sec, data) => this.render_sales_performance($sec, data));
 	}
 
 	render_sales_performance($panel, data) {
@@ -307,8 +333,7 @@ blueline.BusinessKpiDashboard = class BusinessKpiDashboard {
 
 	load_financial_health() {
 		const $panel = this.body.find('[data-panel="financial"]');
-		if (!$panel.find(".bkpi-initialized").length) {
-			$panel.html(`
+		const template = `
 				<div class="bkpi-initialized"></div>
 				<div class="row bkpi-cards bkpi-health-kpis"></div>
 				<div class="row">
@@ -333,10 +358,9 @@ blueline.BusinessKpiDashboard = class BusinessKpiDashboard {
 					<div class="bkpi-section-title">${__("Petty Cash Approved This Month")}</div>
 					<div class="bkpi-petty-cash"></div>
 				</div>
-			`);
-		}
+			`;
 
-		this.call("get_financial_health", $panel, (data) => this.render_financial_health($panel, data));
+		this.call("get_financial_health", $panel, template, ($sec, data) => this.render_financial_health($sec, data));
 	}
 
 	render_financial_health($panel, data) {
@@ -428,8 +452,7 @@ blueline.BusinessKpiDashboard = class BusinessKpiDashboard {
 
 	load_commission_payroll() {
 		const $panel = this.body.find('[data-panel="commission"]');
-		if (!$panel.find(".bkpi-initialized").length) {
-			$panel.html(`
+		const template = `
 				<div class="bkpi-initialized"></div>
 				<div class="bkpi-section">
 					<div class="row bkpi-cards bkpi-pending-count"></div>
@@ -442,10 +465,9 @@ blueline.BusinessKpiDashboard = class BusinessKpiDashboard {
 					<div class="bkpi-section-title">${__("Top 5 Salespeople (This Fiscal Year)")}</div>
 					<div class="bkpi-top-salespeople"></div>
 				</div>
-			`);
-		}
+			`;
 
-		this.call("get_commission_payroll", $panel, (data) => this.render_commission_payroll($panel, data));
+		this.call("get_commission_payroll", $panel, template, ($sec, data) => this.render_commission_payroll($sec, data));
 	}
 
 	render_commission_payroll($panel, data) {
@@ -516,9 +538,9 @@ blueline.BusinessKpiDashboard = class BusinessKpiDashboard {
 	// Shared helpers
 	// ------------------------------------------------------------------
 
-	// Each response carries the company's currency (or the system default for all companies).
+	// The currency of the section being drawn: its companies' own currency.
 	currency() {
-		return this.response_currency || frappe.defaults.get_default("currency");
+		return this.response_currency;
 	}
 
 	render_cards($el, cards) {
