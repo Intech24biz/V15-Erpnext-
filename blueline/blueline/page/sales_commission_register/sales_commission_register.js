@@ -162,7 +162,7 @@ blueline.SalesCommissionRegister = class SalesCommissionRegister {
 	}
 
 	render(data) {
-		this.render_summary(data.summary, data.status_options);
+		this.render_summary(data.summary, data.status_options, data.currency);
 		this.render_deductions(data.deductions);
 		this.render_table(data.entries);
 	}
@@ -228,15 +228,16 @@ blueline.SalesCommissionRegister = class SalesCommissionRegister {
 		});
 	}
 
-	render_summary(summary, status_options) {
+	render_summary(summary, status_options, company_currency) {
 		const $summary = this.body.find(".scr-summary").empty();
 
 		status_options.forEach((status) => {
 			const bucket = summary[status] || { count: 0, amounts: [] };
 			// One line per currency: amounts of companies in different currencies are never added.
+			// Nothing to add up: zero in the selected company's currency (or a dash for all).
 			const amounts = (bucket.amounts || []).length
 				? bucket.amounts.map((a) => `<div>${format_currency(a.amount, a.currency)}</div>`).join("")
-				: `<div>—</div>`;
+				: `<div>${company_currency ? format_currency(0, company_currency) : "—"}</div>`;
 			$(`
 				<div class="col-md-2 col-sm-4">
 					<div class="scr-summary-card">

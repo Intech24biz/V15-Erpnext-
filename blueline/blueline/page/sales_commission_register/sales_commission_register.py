@@ -106,6 +106,8 @@ def get_entries(
 	return {
 		"entries": entries,
 		"summary": summary,
+		# The selected company's currency, so empty totals still show it (None for all companies).
+		"currency": company_currency(company) if company else None,
 		"status_options": STATUS_OPTIONS,
 		"deductions": get_outstanding_deductions(matched_sales_person, commission_credited_to, company),
 	}
